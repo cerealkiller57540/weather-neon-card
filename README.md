@@ -11,7 +11,7 @@
 
 [![Open your Home Assistant instance and open this repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=cerealkiller57540&repository=weather-neon-card&category=plugin)
 
-<img src="https://raw.githubusercontent.com/cerealkiller57540/weather-neon-card/main/images/scenes.jpg" alt="Weather Neon Card in eight conditions: sunny, cloudy, light rain, heavy rain, snow with frost, fog, thunderstorm at night with the moon, and a clear night with an aurora" width="900">
+<img src="https://raw.githubusercontent.com/cerealkiller57540/weather-neon-card/main/images/scenes.jpg" alt="Weather Neon Card in eight conditions: frost on a sunny freezing day, cloudy, light rain, heavy rain, snow with frost, fog, thunderstorm at night with the moon, and a clear night with an aurora" width="900">
 
 </div>
 
