@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.3.0-webgl';
+const VERSION = '3.3.1-webgl';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -2099,11 +2099,15 @@ class WeatherNeonCardWebgl extends HTMLElement {
       && Number.isFinite(temp) && temp <= this._config.frost_below);
     if (frostNow && !this._frostOn) { this._frostOn = true; this._startFrost(); }
     else if (!frostNow && this._frostOn) { this._frostOn = false; this._clearFrost(); }
-    if (this._fxGl && frostNow) this._ensureFxLoop();
 
     // CANICULE : heat-haze sur l'icône hero (au-dessus du divider). La classe pose le
     // filter SVG sur .wicon ; l'anim JS fait dériver la turbulence (= la chaleur monte).
     this._fxHeatOn = heatOn;
+    // _fxGlEnsure tourne en TETE de _render, avant que _frostOn/_fxHeatOn soient poses
+    // ci-dessus : au premier rendu en gel (ou canicule) le contexte FX restait donc ferme,
+    // et le dirty-check bloquait tout rendu suivant -- pas de givre apres un F5 tant
+    // qu'aucune entite surveillee ne bougeait. On redemande ici, flags a jour.
+    if (frostNow || heatOn) { this._fxGlEnsure(); if (this._fxGl) this._ensureFxLoop(); }
     // Le filtre SVG RESTE : la passe GL post-traite le canvas d'effets, pas l'icone
     // (qui est du DOM). Le GL ajoute la chaleur SUR les effets meteo -- mirage, glow,
     // teinte -- la ou le SVG ne touche que .wicon. Les deux sont complementaires,
