@@ -127,7 +127,7 @@ More than a hundred other `sky_*`, `fx_*` and `fogx_*` settings (cloud scale, dr
 
 **The labels are in French.** Translation is on the way. Every option can also be set in YAML.
 
-**Which theme is in the screenshots?** Neo Tokyo, from [Home-Assistant-Neon-Cards](https://github.com/cerealkiller57540/Home-Assistant-Neon-Cards). The card works with any theme. The weather data in the screenshots is made up.
+**Which theme is in the screenshots?** Neo Tokyo, the author's own dark theme (not published). The card works with any theme. The weather data in the screenshots is made up.
 
 ## 🌃 More neon cards
 
