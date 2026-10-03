@@ -577,9 +577,9 @@ function atmoPastille(hass, iconKey, entityId, nextEntityId) {
   if (nx && nx.state !== 'unavailable' && nx.state !== 'unknown') {
     const nv = parseFloat(nx.state);
     if (!isNaN(cur) && !isNaN(nv)) {
-      if (nv > cur)      trend = `<span class="watmo-tr up"   title="Se dégrade demain">▲</span>`;
-      else if (nv < cur) trend = `<span class="watmo-tr down" title="S'améliore demain">▼</span>`;
-      else               trend = `<span class="watmo-tr flat" title="Stable demain">→</span>`;
+      if (nv > cur)      trend = `<span class="watmo-tr up"   title="${_t(`Se dégrade demain`)}">▲</span>`;
+      else if (nv < cur) trend = `<span class="watmo-tr down" title="${_t(`S'améliore demain`)}">▼</span>`;
+      else               trend = `<span class="watmo-tr flat" title="${_t(`Stable demain`)}">→</span>`;
     }
   }
 
@@ -994,6 +994,254 @@ function cleanLocationName(fn) {
 // ═══════════════════════════════════════════════════════
 //  CARD
 // ═══════════════════════════════════════════════════════
+/* ── i18n FR/EN : la clé est la chaîne française (le français s'affiche tel quel) ── */
+let _lang = 'en';
+const _EN = {
+ "Accent couleur = condition": "Accent colour = condition",
+ "Accent couleur selon la météo": "Accent colour by weather",
+ "Activer": "Enable",
+ "Afficher le nom": "Show name",
+ "Amplitude": "Amplitude",
+ "Angle": "Angle",
+ "Anisotropie": "Anisotropy",
+ "Anti-brouillards — lisibilité des textes en brouillard ou neige (0 = éteints)": "Anti-fog — text legibility in fog or snow (0 = off)",
+ "Arc (x rayon)": "Arc (x radius)",
+ "Assombrissement limbe": "Limb darkening",
+ "Aurore boréale (easter egg)": "Northern lights (easter egg)",
+ "Averse en fond (derrière vitre)": "Background shower (behind glass)",
+ "Ballant": "Sway",
+ "Barbes (mixmap)": "Barbs (mixmap)",
+ "Battement de la cape": "Cape flutter",
+ "Bloc air/pollens": "Air/pollen block",
+ "Brassage": "Mixing",
+ "Brouillard": "Fog",
+ "Brouillard billboards (nappes WebGL) — réglages du banc du 21/09.": "Billboard fog (WebGL layers) — settings from the 21/09 test bench.",
+ "Brouillard billboards — nappe basse": "Billboard fog — ground layer",
+ "Brouillard billboards — niveau": "Billboard fog — level",
+ "Brouillard billboards — nombre": "Billboard fog — count",
+ "Brouillard billboards — opacité": "Billboard fog — opacity",
+ "Brouillard billboards — rotation": "Billboard fog — rotation",
+ "Brouillard billboards — scintillement": "Billboard fog — flicker",
+ "Brouillard billboards — taille": "Billboard fog — size",
+ "Brouillard billboards — teinte": "Billboard fog — hue",
+ "Brouillard billboards — vitesse": "Billboard fog — speed",
+ "Brouillard toujours visible (démo)": "Fog always visible (demo)",
+ "Brume (gain)": "Haze (gain)",
+ "Buée": "Fog on glass",
+ "Cabré (°)": "Rearing (°)",
+ "Canal bleu": "Blue channel",
+ "Canal rouge": "Red channel",
+ "Canal vert": "Green channel",
+ "Canicule": "Heatwave",
+ "Capteur de luminosité (sinon : position du soleil)": "Illuminance sensor (otherwise: sun position)",
+ "Centre": "Centre",
+ "Chance de neige": "Snow chance",
+ "Chance de pluie": "Rain chance",
+ "Chute": "Fall",
+ "Ciel WebGL": "WebGL sky",
+ "Clairières : halo (px)": "Clearings: halo (px)",
+ "Clairières : le givre s'écarte du contenu. Lisibilité = à quel point ça dégèle, seuil = à partir de quelle densité d'encre, halo = jusqu'où ça déborde autour de chaque texte.": "Clearings: the frost moves away from the content. Legibility = how much it thaws, threshold = from which ink density, halo = how far it spreads around each text.",
+ "Clairières : lisibilité": "Clearings: legibility",
+ "Clairières : seuil": "Clearings: threshold",
+ "Colonne lever/coucher/rafales": "Sunrise/sunset/gusts column",
+ "Couche ciel WebGL": "WebGL sky layer",
+ "Couverture": "Coverage",
+ "Couverture (gain)": "Coverage (gain)",
+ "Cristaux de givre": "Frost crystals",
+ "DIM": "SUN",
+ "Densité": "Density",
+ "Direction (degrés)": "Direction (degrees)",
+ "Douceur terminateur": "Terminator softness",
+ "Durée du passage (s)": "Flyby duration (s)",
+ "Décalage": "Offset",
+ "Dérive": "Drift",
+ "E.T. pleine lune (easter egg)": "E.T. full moon (easter egg)",
+ "Effets atmosphériques": "Atmospheric effects",
+ "Effets généraux": "General effects",
+ "Effets néon (scanlines)": "Neon effects (scanlines)",
+ "Ensoleillé": "Sunny",
+ "Entité introuvable :": "Entity not found:",
+ "Entité météo": "Weather entity",
+ "Entité soleil (lever/coucher, et repli jour/nuit)": "Sun entity (sunrise/sunset, and day/night fallback)",
+ "Entité vigilance (optionnel)": "Alert entity (optional)",
+ "Entités additionnelles": "Additional entities",
+ "Exceptionnel": "Exceptional",
+ "Face nuit": "Night side",
+ "Finesse": "Fineness",
+ "Finesse (mixmap)": "Fineness (mixmap)",
+ "Flou premier plan": "Foreground blur",
+ "Fond (dégradé)": "Background (gradient)",
+ "Fond réactif (écrase card-mod)": "Reactive background (overrides card-mod)",
+ "Fond réactif à la météo": "Weather-reactive background",
+ "Fondu des lointains": "Distance fade",
+ "Force": "Strength",
+ "Forte pluie": "Heavy rain",
+ "Fréquence": "Frequency",
+ "GLITCH le chat": "GLITCH the cat",
+ "GLITCH le chat 🐱": "GLITCH the cat 🐱",
+ "Givre": "Frost",
+ "Glissement (rack focus)": "Sliding (rack focus)",
+ "Glow": "Glow",
+ "Grain": "Grain",
+ "Grain (mixmap)": "Grain (mixmap)",
+ "Grain (tramage)": "Grain (dithering)",
+ "Grêle": "Hail",
+ "Halo": "Halo",
+ "Halo (intensité)": "Halo (intensity)",
+ "Halo (px)": "Halo (px)",
+ "Hauteur de passage (x rayon)": "Flyby height (x radius)",
+ "Hauteur horizon": "Horizon height",
+ "Horaire": "Hourly",
+ "Humidité": "Humidity",
+ "Inclinaison (degrés)": "Tilt (degrees)",
+ "Inondation": "Flooding",
+ "Intensité": "Intensity",
+ "Intensité (nombre effectif)": "Intensity (effective count)",
+ "Intensité crépuscule": "Twilight intensity",
+ "JEU": "THU",
+ "Jaune": "Yellow",
+ "Journalier": "Daily",
+ "LUN": "MON",
+ "Largeur": "Width",
+ "Largeur de référence (px)": "Reference width (px)",
+ "Libellé condition": "Condition label",
+ "Libellé condition custom": "Custom condition label",
+ "Luminosité (jour/nuit)": "Illuminance (day/night)",
+ "Lumière cendrée": "Earthshine",
+ "Lune": "Moon",
+ "Lune photo-réaliste (WebGL)": "Photo-realistic moon (WebGL)",
+ "MAR": "TUE",
+ "MER": "WED",
+ "Mirage": "Mirage",
+ "Montée": "Rise",
+ "Montée (x rayon)": "Climb (x radius)",
+ "Nb de jours/créneaux": "No. of days/slots",
+ "Ne se déclenche que lune noire + ciel dégagé + nuit. fx_aurore_toujours = mode démo, jamais en prod.": "Only triggers with a new moon + clear sky + night. fx_aurore_toujours = demo mode, never in production.",
+ "Neige": "Snow",
+ "Neige-verglas": "Snow/ice",
+ "Nom affiché": "Display name",
+ "Nombre de colonnes": "Number of columns",
+ "Nombre de flocons (plafond)": "Flake count (cap)",
+ "Nombre de nappes": "Number of layers",
+ "Nuageux": "Cloudy",
+ "Nuit claire": "Clear night",
+ "Nuit d'après la luminosité 🌙": "Night from illuminance 🌙",
+ "Nuit déduite du soleil (sinon lux)": "Night from sun (else lux)",
+ "Nuit nuageuse": "Cloudy night",
+ "Nuit — plancher opacité": "Night — opacity floor",
+ "Nuit — portée du halo": "Night — halo reach",
+ "Nuit — reflet lunaire": "Night — moon reflection",
+ "Ondulation": "Waviness",
+ "Opacité": "Opacity",
+ "Opacité (maître-volume)": "Opacity (master volume)",
+ "Orage": "Thunderstorm",
+ "Orage pluvieux": "Rainy thunderstorm",
+ "Orages": "Thunderstorms",
+ "Orange": "Orange",
+ "Paillettes": "Glitter",
+ "Partage vitre entre effets": "Glass sharing between effects",
+ "Particules CSS/canvas": "CSS/canvas particles",
+ "Partiellement nuageux": "Partly cloudy",
+ "Pastilles qualité air / pollens ☣": "Air quality / pollen pills ☣",
+ "Pente cristaux": "Crystal slope",
+ "Plafond cumul vitre": "Glass stacking cap",
+ "Pleine lune + ciel dégagé + nuit : un passage à l'affichage, puis à chaque tap sur la lune. fx_et_toujours = mode démo, jamais en prod.": "Full moon + clear sky + night: one flyby on display, then on every tap on the moon. fx_et_toujours = demo mode, never in production.",
+ "Plis": "Folds",
+ "Pluie": "Rain",
+ "Pluie et neige": "Rain and snow",
+ "Pluie nocturne": "Night rain",
+ "Pluie sur vitre": "Rain on glass",
+ "Pluie-inondation": "Rain/flood",
+ "Pollens (J+1)": "Pollen (D+1)",
+ "Pollens (jour)": "Pollen (today)",
+ "Pollens — aujourd'hui": "Pollen — today",
+ "Pollens — demain (J+1, tendance)": "Pollen — tomorrow (D+1, trend)",
+ "Position de base": "Base position",
+ "Post-process WebGL (pluie/givre/chaleur/neige)": "WebGL post-process (rain/frost/heat/snow)",
+ "Pression": "Pressure",
+ "Profondeur (gain)": "Depth (gain)",
+ "Profondeur (écart des plans)": "Depth (layer spacing)",
+ "Prévisions & affichage": "Forecast & display",
+ "Pulsation": "Pulse",
+ "Qualité air (J+1)": "Air quality (D+1)",
+ "Qualité air (jour)": "Air quality (today)",
+ "Qualité de l'air — aujourd'hui (Atmo France)": "Air quality — today (Atmo France)",
+ "Qualité de l'air — demain (J+1, tendance)": "Air quality — tomorrow (D+1, trend)",
+ "Recul brume (cumul)": "Haze back-off (stacking)",
+ "Recul givre (cumul)": "Frost back-off (stacking)",
+ "Recul givre si neige": "Frost back-off with snow",
+ "Relief": "Relief",
+ "Relief (doublure argentée)": "Relief (silver lining)",
+ "Relief cratères": "Crater relief",
+ "Rouge": "Red",
+ "Réfraction": "Refraction",
+ "S'améliore demain": "Improving tomorrow",
+ "SAM": "SAT",
+ "Saturation": "Saturation",
+ "Saturation (gain)": "Saturation (gain)",
+ "Scanlines + temp glitchée": "Scanlines + glitched temp",
+ "Se dégrade demain": "Worsening tomorrow",
+ "Seuil disque lunaire éclairé": "Lit moon disc threshold",
+ "Seuil givre (°C)": "Frost threshold (°C)",
+ "Sinuosité (mixmap)": "Sinuosity (mixmap)",
+ "Soleil (lever/coucher)": "Sun (sunrise/sunset)",
+ "Source": "Source",
+ "Spéculaire": "Specular",
+ "Stable demain": "Stable tomorrow",
+ "Stat : Humidité": "Stat: Humidity",
+ "Stat : Pression": "Stat: Pressure",
+ "Stat : Vent": "Stat: Wind",
+ "Taille": "Size",
+ "Taille (px)": "Size (px)",
+ "Taille des gouttes": "Drop size",
+ "Taille du vélo (x diamètre)": "Bike size (x diameter)",
+ "Taille tuilage": "Tile size",
+ "Teinte": "Hue",
+ "Teinte cyan": "Cyan tint",
+ "Toujours actif (démo)": "Always active (demo)",
+ "Toujours visible (démo)": "Always visible (demo)",
+ "Trait (mixmap)": "Stroke (mixmap)",
+ "Transverses (cumuls d'effets)": "Cross-effects (stacking)",
+ "Très venteux": "Very windy",
+ "Type de prévision": "Forecast type",
+ "Typo Orbitron": "Orbitron font",
+ "Typo Orbitron (Google Fonts)": "Orbitron font (Google Fonts)",
+ "VEN": "FRI",
+ "Vent": "Wind",
+ "Vent & brouillard": "Wind & fog",
+ "Vent (rafales)": "Wind (gusts)",
+ "Vent toujours visible (démo)": "Wind always visible (demo)",
+ "Vent violent": "Strong wind",
+ "Vent — déformation": "Wind — distortion",
+ "Vent — teinte": "Wind — hue",
+ "Vent — tourbillon": "Wind — swirl",
+ "Vent — turbulence": "Wind — turbulence",
+ "Venteux": "Windy",
+ "Vert": "Green",
+ "Vigilance": "Alert",
+ "Vigilance (Météo-France)": "Alert (Météo-France)",
+ "Vitesse défilement": "Scroll speed",
+ "ex: Maison": "e.g. Home",
+ "finesse/barbes/trait/grain/sinu : cache la mixmap (pas envoyés au shader), changer invalide le cache.": "finesse/barbs/stroke/grain/sinu: mixmap cache (not sent to the shader), changing them invalidates the cache.",
+ "sky_* : opacite/couverture/saturation/brume/profondeur = GAINS (1.00 = neutre), pas des absolus.": "sky_* : opacity/coverage/saturation/haze/depth = GAINS (1.00 = neutral), not absolute values.",
+ "sun.sun (défaut)": "sun.sun (default)",
+ "Échelle des nuages": "Cloud scale",
+ "Éclat": "Brightness",
+ "Épaisseur": "Thickness",
+ "Épaisseur (sigma)": "Thickness (sigma)",
+ "Étendue (x rayon)": "Extent (x radius)"
+};
+const _t = (fr) => {
+  if (_lang === 'fr' || fr == null || fr === '') return fr;
+  const k = String(fr).replace(/\s+/g, ' ').trim();
+  return _EN[k] ?? fr;
+};
+const _setLang = (h) => {
+  const l = /^fr/i.test(String(h?.locale?.language || h?.language || '')) ? 'fr' : 'en';
+  if (l === _lang) return false;
+  _lang = l; return true;
+};
+
 class WeatherNeonCardWebgl extends HTMLElement {
   // px : marge entre le bas des effets 2D et le trait des previsions.
   // A ZERO apres mesure du 2026-08-18. La pluie de fond s'arretait DEJA pile sur le
@@ -1031,6 +1279,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
   set hass(hass) {
     this._hass = hass;
+    _setLang(hass); if (this._lg !== _lang) { this._lg = _lang; this._renderSnap = null; }
     this._fetchForecast();
     this._render();
     // ré-arme la vie de GLITCH si le timer est tombé (retour sur la vue : le DOM
@@ -1801,7 +2050,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // decide, et il repasse a chaque _render.
 
     const st = this._hass.states[this._config.entity];
-    if (!st) { this._elInner.innerHTML = `<div style="padding:16px">Entité introuvable : ${this._config.entity}</div>`; return; }
+    if (!st) { this._elInner.innerHTML = `<div style="padding:16px">${_t('Entité introuvable :')} ${this._config.entity}</div>`; return; }
 
     // Dirty-check : HA pousse `set hass` plusieurs fois/seconde. On ne re-render que
     // si un état PERTINENT a changé (sinon : centaines de recalculs/RAF inutiles =
@@ -1878,7 +2127,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const tcol = (t) => `hsl(${210 - Math.max(0, Math.min(1, (t - wMin) / span)) * 175} 90% 62%)`;
     const fcHtml = fc.map((f, i) => {
       const d = new Date(f.datetime);
-      const lbl = isHourly ? `${String(d.getHours()).padStart(2, '0')}h` : DAYS_FR[d.getDay()];
+      const lbl = isHourly ? `${String(d.getHours()).padStart(2, '0')}h` : _t(DAYS_FR[d.getDay()]);
       const hi = Math.round(f.temperature);
       const lo = f.templow != null ? Math.round(f.templow) : null;
       const range = lo != null
@@ -1942,7 +2191,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // et n'a donc rien à faire ici.
     // Repli sur le générique si l'entité manque (intégration non-Météo-France) ou si son
     // état est indisponible — sinon la card afficherait « unavailable » en clair.
-    const condGeneric = COND_FR[cond] || cond;
+    const condGeneric = _t(COND_FR[cond]) || cond;
     let condLabel = condGeneric;
     // ⚠️ La nuit, on garde le générique. Le capteur Météo-France décrit le temps DU JOUR
     // et ne connaît pas la nuit : il renvoie « Ensoleillé » à 21h, à côté de la lune et
@@ -1966,7 +2215,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
         <div class="${tempCls}" data-t="${temp}${unit}">${temp}<small>${unit}</small></div>
         <div class="wnow">
           <div class="wcond">${escHtml(condLabel)}</div>
-          ${vigi ? `<div class="wvigi" style="color:${vigi.color}">⚠ Vigilance ${Object.keys(VIGI_RANK)[vigi.rank]} — ${vigi.risks.join(', ')}</div>` : ''}
+          ${vigi ? `<div class="wvigi" style="color:${vigi.color}">⚠ ${_t('Vigilance')} ${_t(Object.keys(VIGI_RANK)[vigi.rank])} — ${vigi.risks.map(r => _t(r)).join(', ')}</div>` : ''}
           ${showName ? `<div class="wloc">${name}</div>` : ''}
         </div>
         ${asideHtml}
@@ -4936,7 +5185,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     if (!this._rendered) { this._rendered = true; this._renderEditor(); }
     else this._syncValues();
   }
-  set hass(h) { this._hass = h; this._fillDatalists(); }   // JAMAIS de render ici
+  set hass(h) { this._hass = h; _setLang(h); if (this._rendered && this._bl !== _lang) this._renderEditor(); else this._fillDatalists(); }   // JAMAIS de render ici
   disconnectedCallback() { this._rendered = false; }
 
   // ── Lecture / écriture config (clés imbriquées via ".") ────────────
@@ -4979,7 +5228,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _group(title, expanded, buildFn) {
     const panel = document.createElement('ha-expansion-panel');
     panel.outlined = true;
-    panel.header = title;
+    panel.header = _t(title);
     if (expanded) panel.expanded = true;
     (this._appendTo || this).appendChild(panel);
     const prevAppendTo = this._appendTo;
@@ -4990,13 +5239,13 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   }
 
   // ── Helpers de champ (signatures FIXES) ─────────────────────────────
-  _section(t) { const d = document.createElement('div'); d.className = 'sec'; d.textContent = t; (this._appendTo || this).appendChild(d); return d; }
-  _hint(t)    { const d = document.createElement('div'); d.className = 'hint'; d.textContent = t; (this._appendTo || this).appendChild(d); return d; }
+  _section(t) { const d = document.createElement('div'); d.className = 'sec'; d.textContent = _t(t); (this._appendTo || this).appendChild(d); return d; }
+  _hint(t)    { const d = document.createElement('div'); d.className = 'hint'; d.textContent = _t(t); (this._appendTo || this).appendChild(d); return d; }
 
   _text(key, label, ph = '') {
     const row = this._row(label);
     const inp = document.createElement('input');
-    inp.type = 'text'; inp.placeholder = ph; inp.dataset.key = key;
+    inp.type = 'text'; inp.placeholder = _t(ph); inp.dataset.key = key;
     inp.value = this._read(key) ?? '';
     inp.addEventListener('input', () => this._set(key, inp.value));
     row.wrap.appendChild(inp); return inp;
@@ -5026,7 +5275,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _select(key, label, options, emptyLabel = null) {
     const w = this._row(label).wrap;
     const sel = document.createElement('select'); sel.dataset.key = key;
-    if (emptyLabel !== null) { const o = document.createElement('option'); o.value = ''; o.textContent = emptyLabel; sel.appendChild(o); }
+    if (emptyLabel !== null) { const o = document.createElement('option'); o.value = ''; o.textContent = _t(emptyLabel); sel.appendChild(o); }
     options.forEach(opt => {
       const o = document.createElement('option');
       o.value = (typeof opt === 'object') ? opt.value : opt;
@@ -5045,7 +5294,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _entity(key, label, prefix = '', placeholder = '') {
     const row = this._row(label);
     const inp = document.createElement('input'); inp.type = 'text'; inp.autocomplete = 'off';
-    inp.placeholder = placeholder || (prefix || 'domain') + '.…'; inp.dataset.key = key; inp.dataset.prefix = prefix;
+    inp.placeholder = _t(placeholder) || (prefix || 'domain') + '.…'; inp.dataset.key = key; inp.dataset.prefix = prefix;
     inp.setAttribute('list', `weathergl-ent-${(prefix || 'all').replace(/[^a-z]/g, '')}`);
     inp.value = this._read(key) ?? '';
     inp.addEventListener('input', () => this._set(key, inp.value.trim()));
@@ -5056,7 +5305,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _row(labelHtml, isHtml = false) {
     const row = document.createElement('div'); row.className = 'row';
     const lbl = document.createElement('label');
-    if (isHtml) lbl.innerHTML = labelHtml; else lbl.textContent = labelHtml;
+    if (isHtml) lbl.innerHTML = _t(labelHtml); else lbl.textContent = _t(labelHtml);
     const wrap = document.createElement('div'); wrap.className = 'field-wrap';
     row.appendChild(lbl); row.appendChild(wrap); (this._appendTo || this).appendChild(row);
     return { row, wrap };
@@ -5097,6 +5346,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
 
   // ── Render : on vide, on pose le style, on déroule le schéma ────────
   _renderEditor() {
+    this._bl = _lang;
     this.innerHTML = '';
     const st = document.createElement('style'); st.textContent = this._css(); this.appendChild(st);
     this._schema();

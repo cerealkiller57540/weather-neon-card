@@ -125,7 +125,7 @@ More than a hundred other `sky_*`, `fx_*` and `fogx_*` settings (cloud scale, dr
 
 **Some cards go blank on my Android phone.** Android WebViews keep at most 8 WebGL contexts per page and drop the oldest one. This card uses a single context for all its layers and all its instances, and keeps it across view changes. If you run many other WebGL cards on one view, use `weather-neon-card` on some of them.
 
-**The labels are in French.** Translation is on the way. Every option can also be set in YAML.
+**Which languages are supported?** English and French (conditions, days, alerts and the editor). Names that come from your sensors are shown as they are. The editor and the card texts follow your Home Assistant language: French if it is French, English otherwise. Reload the page after changing the language. Every option can also be set in YAML.
 
 **Which theme is in the screenshots?** Neo Tokyo, the author's own dark theme (not published). The card works with any theme. The weather data in the screenshots is made up.
 
