@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🌦️ Weather Neon Card
+<img src="https://raw.githubusercontent.com/cerealkiller57540/weather-neon-card/main/images/logo.png" alt="Weather Neon Card" width="480">
 
 **A neon weather card for Home Assistant with a live WebGL sky: rain on the glass, drifting fog, frost, falling snow, lightning, and a real moon.**
 
