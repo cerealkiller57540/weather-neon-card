@@ -38,7 +38,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.1.2';
+const VERSION = '3.5.0';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -516,6 +516,9 @@ function cleanLocationName(fn) {
 /* ── i18n FR/EN : la clé est la chaîne française (le français s'affiche tel quel) ── */
 let _lang = 'en';
 const _EN = {
+ "Qualité de l'air & pollens": "Air quality & pollen",
+ "Affichage": "Display",
+ "Effets": "Effects",
  "Accent couleur = condition": "Accent colour = condition",
  "Accent couleur selon la météo": "Accent colour by weather",
  "Activer": "Enable",
@@ -1878,9 +1881,12 @@ class WeatherNeonCardEditor extends HTMLElement {
     this._bl = _lang;
     this.innerHTML = `
       <style>
-        .wne-wrap{display:flex;flex-direction:column;gap:12px;padding:8px 4px}
-        .wne-wrap label{font-size:13px;display:flex;flex-direction:column;gap:4px}
-        .wne-wrap input,.wne-wrap select{width:100%;padding:6px;box-sizing:border-box}
+        weather-neon-card-editor{--ned-label:color-mix(in srgb,var(--primary-text-color) 82%,transparent);--ned-line:color-mix(in srgb,var(--primary-color) 55%,transparent)}
+        weather-neon-card-editor ha-expansion-panel{display:block;--outline-color:var(--ned-line);--expansion-panel-summary-padding:0 12px;--expansion-panel-content-padding:4px 12px 12px;color:var(--primary-text-color)}
+        .wne-wrap,.wne-in{display:flex;flex-direction:column;gap:12px;padding:8px 4px}
+        .wne-wrap label{font-size:13px;display:flex;flex-direction:column;gap:4px;color:var(--ned-label)}
+        .wne-wrap input,.wne-wrap select{width:100%;padding:6px;box-sizing:border-box;border:1px solid var(--ned-line);border-radius:4px;background:var(--card-background-color);color:var(--primary-text-color)}
+        .wne-wrap input[type=checkbox]{accent-color:var(--primary-color)}
         .wne-row{flex-direction:row !important;align-items:center;gap:8px}
         .wne-row input{width:auto}
       </style>
@@ -1898,44 +1904,54 @@ class WeatherNeonCardEditor extends HTMLElement {
         <label>${_t(`Nombre de colonnes`)}
           <input data-key="forecast_count" data-num type="number" min="3" max="9">
         </label>
-        <label>${_t(`Entité vigilance (optionnel)`)}
-          <input data-key="alert_entity" list="wne-alerts" placeholder="sensor.…_weather_alert">
-          <datalist id="wne-alerts"></datalist>
-        </label>
-        <label>${_t(`Entité soleil (lever/coucher, et repli jour/nuit)`)}
-          <input data-key="sun_entity" list="wne-suns" placeholder="sun.sun">
-          <datalist id="wne-suns"></datalist>
-        </label>
-        <label class="wne-row"><input data-key="night_from_sun" data-defaultOn type="checkbox"> ${_t(`Nuit d'après la luminosité 🌙`)}</label>
-        <label>${_t(`Capteur de luminosité (sinon : position du soleil)`)}
-          <input data-key="lux_entity" list="wne-lux" placeholder="sensor.outdoor_illuminance">
-          <datalist id="wne-lux"></datalist>
-        </label>
-        <label class="wne-row"><input data-key="show_humidity" data-defaultOn type="checkbox"> ${_t(`Stat : Humidité`)}</label>
-        <label class="wne-row"><input data-key="show_wind" data-defaultOn type="checkbox"> ${_t(`Stat : Vent`)}</label>
-        <label class="wne-row"><input data-key="show_pressure" data-defaultOn type="checkbox"> ${_t(`Stat : Pression`)}</label>
-        <label class="wne-row"><input data-key="show_atmo" data-defaultOn type="checkbox"> ${_t(`Pastilles qualité air / pollens ☣`)}</label>
-        <label>${_t(`Qualité de l'air — aujourd'hui (Atmo France)`)}
-          <input data-key="air_entity" list="wne-atmo" placeholder="sensor.atmo_france_qualite_globale_…">
-        </label>
-        <label>${_t(`Qualité de l'air — demain (J+1, tendance)`)}
-          <input data-key="air_entity_next" list="wne-atmo" placeholder="…_j_1">
-        </label>
-        <label>${_t(`Pollens — aujourd'hui`)}
-          <input data-key="pollen_entity" list="wne-atmo" placeholder="sensor.atmo_france_qualite_globale_pollen_…">
-        </label>
-        <label>${_t(`Pollens — demain (J+1, tendance)`)}
-          <input data-key="pollen_entity_next" list="wne-atmo" placeholder="…_pollen_…_j_1">
-        </label>
-        <datalist id="wne-atmo"></datalist>
-        <label class="wne-row"><input data-key="show_aside" data-defaultOn type="checkbox"> ${_t(`Colonne lever/coucher/rafales`)}</label>
-        <label class="wne-row"><input data-key="mood_accent" data-defaultOn type="checkbox"> ${_t(`Accent couleur selon la météo`)}</label>
-        <label class="wne-row"><input data-key="orbitron" type="checkbox"> ${_t(`Typo Orbitron (Google Fonts)`)}</label>
-        <label class="wne-row"><input data-key="glitch" data-defaultOn type="checkbox"> ${_t(`GLITCH le chat 🐱`)}</label>
-        <label class="wne-row"><input data-key="particles" data-defaultOn type="checkbox"> ${_t(`Effets atmosphériques`)}</label>
-        <label class="wne-row"><input data-key="neon_fx" data-defaultOn type="checkbox"> ${_t(`Effets néon (scanlines)`)}</label>
-        <label class="wne-row"><input data-key="reactive_bg" type="checkbox"> ${_t(`Fond réactif à la météo`)}</label>
+        <ha-expansion-panel data-header="Entités additionnelles"><div class="wne-in">
+          <label>${_t(`Entité vigilance (optionnel)`)}
+            <input data-key="alert_entity" list="wne-alerts" placeholder="sensor.…_weather_alert">
+            <datalist id="wne-alerts"></datalist>
+          </label>
+          <label>${_t(`Entité soleil (lever/coucher, et repli jour/nuit)`)}
+            <input data-key="sun_entity" list="wne-suns" placeholder="sun.sun">
+            <datalist id="wne-suns"></datalist>
+          </label>
+          <label class="wne-row"><input data-key="night_from_sun" data-defaultOn type="checkbox"> ${_t(`Nuit d'après la luminosité 🌙`)}</label>
+          <label>${_t(`Capteur de luminosité (sinon : position du soleil)`)}
+            <input data-key="lux_entity" list="wne-lux" placeholder="sensor.outdoor_illuminance">
+            <datalist id="wne-lux"></datalist>
+          </label>
+        </div></ha-expansion-panel>
+        <ha-expansion-panel data-header="Qualité de l'air & pollens"><div class="wne-in">
+          <label class="wne-row"><input data-key="show_atmo" data-defaultOn type="checkbox"> ${_t(`Pastilles qualité air / pollens ☣`)}</label>
+          <label>${_t(`Qualité de l'air — aujourd'hui (Atmo France)`)}
+            <input data-key="air_entity" list="wne-atmo" placeholder="sensor.atmo_france_qualite_globale_…">
+          </label>
+          <label>${_t(`Qualité de l'air — demain (J+1, tendance)`)}
+            <input data-key="air_entity_next" list="wne-atmo" placeholder="…_j_1">
+          </label>
+          <label>${_t(`Pollens — aujourd'hui`)}
+            <input data-key="pollen_entity" list="wne-atmo" placeholder="sensor.atmo_france_qualite_globale_pollen_…">
+          </label>
+          <label>${_t(`Pollens — demain (J+1, tendance)`)}
+            <input data-key="pollen_entity_next" list="wne-atmo" placeholder="…_pollen_…_j_1">
+          </label>
+          <datalist id="wne-atmo"></datalist>
+        </div></ha-expansion-panel>
+        <ha-expansion-panel data-header="Affichage"><div class="wne-in">
+          <label class="wne-row"><input data-key="show_humidity" data-defaultOn type="checkbox"> ${_t(`Stat : Humidité`)}</label>
+          <label class="wne-row"><input data-key="show_wind" data-defaultOn type="checkbox"> ${_t(`Stat : Vent`)}</label>
+          <label class="wne-row"><input data-key="show_pressure" data-defaultOn type="checkbox"> ${_t(`Stat : Pression`)}</label>
+          <label class="wne-row"><input data-key="show_aside" data-defaultOn type="checkbox"> ${_t(`Colonne lever/coucher/rafales`)}</label>
+        </div></ha-expansion-panel>
+        <ha-expansion-panel data-header="Effets"><div class="wne-in">
+          <label class="wne-row"><input data-key="mood_accent" data-defaultOn type="checkbox"> ${_t(`Accent couleur selon la météo`)}</label>
+          <label class="wne-row"><input data-key="orbitron" type="checkbox"> ${_t(`Typo Orbitron (Google Fonts)`)}</label>
+          <label class="wne-row"><input data-key="glitch" data-defaultOn type="checkbox"> ${_t(`GLITCH le chat 🐱`)}</label>
+          <label class="wne-row"><input data-key="particles" data-defaultOn type="checkbox"> ${_t(`Effets atmosphériques`)}</label>
+          <label class="wne-row"><input data-key="neon_fx" data-defaultOn type="checkbox"> ${_t(`Effets néon (scanlines)`)}</label>
+          <label class="wne-row"><input data-key="reactive_bg" type="checkbox"> ${_t(`Fond réactif à la météo`)}</label>
+        </div></ha-expansion-panel>
       </div>`;
+    // header/outlined sont des PROPRIÉTÉS de ha-expansion-panel, pas des attributs
+    this.querySelectorAll('ha-expansion-panel').forEach(p => { p.outlined = true; p.header = _t(p.dataset.header); });
     // listeners (une seule fois). 'change' = commit au blur / à la sélection datalist
     // → l'écho setConfig arrive quand le champ n'a plus le focus, donc _syncValues
     // ne réécrit jamais pendant la frappe. (input live = boucle d'écho, à éviter ici.)

@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.3.2-webgl';
+const VERSION = '3.5.0-webgl';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -5298,16 +5298,17 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _css() {
     return `
       :host { display:block; padding:14px; font-family:var(--primary-font-family,Roboto,sans-serif); }
-      .sec { font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--primary-color);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--divider-color); }
+      weather-neon-card-webgl-editor { --ned-label:color-mix(in srgb,var(--primary-text-color) 82%,transparent);--ned-dim:color-mix(in srgb,var(--primary-text-color) 60%,transparent);--ned-accent:color-mix(in srgb,var(--primary-color) 55%,var(--primary-text-color));--ned-line:color-mix(in srgb,var(--primary-color) 55%,transparent); }
+      .sec { font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--ned-accent);margin:16px 0 6px;padding-bottom:4px;border-bottom:1px solid var(--ned-line); }
       .sec:first-child { margin-top:0; }
       .row { display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:0 4px; }
-      .row label { flex:0 0 160px;font-size:12px;color:var(--secondary-text-color); }
+      .row label { flex:0 0 160px;font-size:12px;color:var(--ned-label); }
       .field-wrap { flex:1;min-width:0;display:flex; }
-      input[type=text],input[type=number],select { flex:1;width:100%;padding:4px 8px;border:1px solid var(--divider-color);border-radius:4px;background:var(--card-background-color);color:var(--primary-text-color);font-size:12px;outline:none;box-sizing:border-box; }
+      input[type=text],input[type=number],select { flex:1;width:100%;padding:4px 8px;border:1px solid var(--ned-line);border-radius:4px;background:var(--card-background-color);color:var(--primary-text-color);font-size:12px;outline:none;box-sizing:border-box; }
       select { cursor:pointer; }
       input:focus,select:focus { box-shadow:0 0 0 1px var(--primary-color); }
-      ha-expansion-panel { display:block; margin-bottom:8px; --ha-card-border-radius:8px; }
-      .hint { font-size:11px;color:var(--secondary-text-color);font-style:italic;margin:-2px 4px 6px 168px; }
+      ha-expansion-panel { display:block; margin-bottom:8px; --ha-card-border-radius:8px; --outline-color:var(--ned-line); --expansion-panel-summary-padding:0 12px; color:var(--primary-text-color); }
+      .hint { font-size:11px;color:var(--ned-dim);font-style:italic;margin:-2px 4px 6px 168px; }
     `;
   }
 
