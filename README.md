@@ -114,6 +114,10 @@ pollen_entity: sensor.atmo_france_qualite_globale_pollen_<zone>
 | `fx_aurore` / `fx_aurore_toujours` | `true` / `false` | Aurora easter egg / demo mode |
 | `fx_et` / `fx_et_toujours` | `true` / `false` | Full-moon easter egg / demo mode |
 | `largeur_ref` | `380` | Width the card is drawn at; narrower columns scale the whole block |
+| `show_clock` | `false` | Time banner at the top of the card (the card grows by about 18 px) |
+| `clock_align` / `clock_size` | `center` / `18` | `center` or `left`; time size in px |
+| `clock_format` | `auto` | `auto` (your Home Assistant setting), `12h` or `24h` |
+| `clock_date` / `clock_seconds` | `true` / `false` | Short date next to the time / show seconds |
 
 More than a hundred other `sky_*`, `fx_*` and `fogx_*` settings (cloud scale, drop size, frost branches, snow depth, moon relief…) are easiest to tune from the visual editor, where each is a slider with its range.
 

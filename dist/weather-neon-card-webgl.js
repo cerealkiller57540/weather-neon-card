@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.5.0-webgl';
+const VERSION = '3.6.0-webgl';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -439,6 +439,14 @@ function buildConfig(raw) {
     lux_entity:    ('lux_entity' in raw) ? raw.lux_entity : null,
     night_from_sun: raw.night_from_sun ?? true,
     show_aside:    raw.show_aside    ?? true,  // colonne droite (lever/coucher/rafales)
+    // bandeau horloge en tete de card (demande GitHub #1) : absent par defaut, la card
+    // ne change alors ni de taille ni de rendu
+    show_clock:    raw.show_clock    ?? false,
+    clock_format:  ['12h', '24h'].includes(raw.clock_format) ? raw.clock_format : 'auto',
+    clock_align:   raw.clock_align === 'left' ? 'left' : 'center',
+    clock_date:    raw.clock_date    ?? true,
+    clock_seconds: raw.clock_seconds ?? false,
+    clock_size:    _n(raw.clock_size, 18),
     show_name:     (raw.show_name ?? true) && raw.name !== '',  // false -> pas de libelle de lieu
     glitch:        raw.glitch        ?? true,  // GLITCH le chat réactif à la météo
     particles:     raw.particles     ?? true,  // effets atmosphériques (CSS + canvas)
@@ -984,6 +992,16 @@ function cleanLocationName(fn) {
 /* ── i18n FR/EN : la clé est la chaîne française (le français s'affiche tel quel) ── */
 let _lang = 'en';
 const _EN = {
+ "Horloge": "Clock",
+ "Afficher l'heure (bandeau en haut)": "Show the time (banner at the top)",
+ "Position": "Position",
+ "À gauche": "Left",
+ "Centré (défaut)": "Centred (default)",
+ "Format": "Format",
+ "Auto (réglage HA)": "Auto (HA setting)",
+ "Afficher la date": "Show the date",
+ "Afficher les secondes": "Show seconds",
+ "Taille de l'heure (px)": "Time size (px)",
  "Accent couleur = condition": "Accent colour = condition",
  "Accent couleur selon la météo": "Accent colour by weather",
  "Activer": "Enable",
@@ -1272,6 +1290,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // ré-arme la vie de GLITCH si le timer est tombé (retour sur la vue : le DOM
     // persiste → _lastHtml inchangé → _startGlitchLife ne serait jamais rappelé)
     if (this._built && this._config.glitch && !this._glitchTimer) this._startGlitchLife();
+    if (this._built && this._config.show_clock && !this._clockTimer) this._clockStart();
   }
 
   // Appel du service weather.get_forecasts (HA 2024+) — caché et rafraîchi périodiquement
@@ -1308,6 +1327,38 @@ class WeatherNeonCardWebgl extends HTMLElement {
       const at = this._hass.states[this._config.entity]?.attributes?.forecast;
       if (at) { this._forecast = at; this._render(); }
     }
+  }
+
+  // HORLOGE : le texte est mis a jour hors _render (dont le dirty-check ignore l'heure) ;
+  // un setTimeout cale sur la prochaine minute (ou seconde), pas un setInterval a 1 Hz.
+  _clockFmt() {
+    const h = this._hass, c = this._config, now = new Date();
+    const lang = h?.locale?.language || h?.language || 'fr';
+    const pref = h?.locale?.time_format;
+    const hour12 = c.clock_format === '12h' ? true : c.clock_format === '24h' ? false
+      : pref === '12' ? true : pref === '24' ? false : undefined;
+    const tzo = h?.config?.time_zone ? { timeZone: h.config.time_zone } : {};
+    const mk = (o) => { try { return new Intl.DateTimeFormat(lang, { ...o, ...tzo }).format(now); }
+                        catch (e) { return new Intl.DateTimeFormat(lang, o).format(now); } };
+    const t = mk({ hour: '2-digit', minute: '2-digit', ...(c.clock_seconds ? { second: '2-digit' } : {}), hour12 });
+    const d = c.clock_date ? mk({ weekday: 'short', day: 'numeric', month: 'short' }) : '';
+    return { t, d };
+  }
+  _clockTick() {
+    const root = this.shadowRoot, t = root?.querySelector('.wck-t');
+    if (!t) return;
+    const { t: tt, d } = this._clockFmt();
+    if (t.textContent !== tt) t.textContent = tt;
+    const de = root.querySelector('.wck-d');
+    if (de && de.textContent !== d) de.textContent = d;
+  }
+  _clockStart() {
+    clearTimeout(this._clockTimer); this._clockTimer = null;
+    if (!this._config?.show_clock) return;
+    this._clockTick();
+    const step = this._config.clock_seconds ? 1000 : 60000;
+    const wait = step - (Date.now() % step) + 20;
+    this._clockTimer = setTimeout(() => { this._clockTimer = null; this._clockStart(); }, wait);
   }
 
   // Construit le squelette UNE fois (style + ha-card) dans le shadowRoot.
@@ -1460,7 +1511,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     clearTimeout(this._frostReflow); this._frostReflow = null;
     this._fxFlakes = null; this._fxFlakeKey = null; this._fxSnowLast = 0;
     for (const k of ['_fxRAF', '_frostRAF', '_heatRAF']) if (this[k]) { cancelAnimationFrame(this[k]); this[k] = null; }
-    for (const k of ['_glitchTimer', '_stormTimer', '_nightTimer']) if (this[k]) { clearTimeout(this[k]); this[k] = null; }
+    for (const k of ['_glitchTimer', '_stormTimer', '_nightTimer', '_clockTimer']) if (this[k]) { clearTimeout(this[k]); this[k] = null; }
     for (const k of ['_ro', '_fxIO']) if (this[k]) { this[k].disconnect(); this[k] = null; }
     this._bolt = null;
     this._frostOn = false; this._frostSegs = null;  // forcera la re-croissance à la reconnexion
@@ -2081,6 +2132,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const acc = this._config.mood_accent ? (ACCENT[cond] || null) : null;
     if (acc) this._elCard.style.setProperty('--wnc-acc', acc);
     else this._elCard.style.removeProperty('--wnc-acc');
+    this._elCard.style.setProperty('--wck-size', this._config.clock_size);
+    this._elCard.classList.toggle('wck-on', !!this._config.show_clock);
 
     // sensors externes (Météo-France) : vent + probas. Config explicite OU auto-détection
     // depuis le préfixe ville (weather.<base> → sensor.<base>_wind_speed, _rain_chance…).
@@ -2195,7 +2248,11 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // La bande .wcatband est clippée sur le divider ; le chat (.wcat) part caché et émerge.
     const glitchBand = glitch ? `<div class="wcatband">${glitch}</div>` : '';
 
+    const clockHtml = this._config.show_clock
+      ? `<div class="wclock wck-${this._config.clock_align}">${this._config.clock_date ? '<span class="wck-d"></span>' : ''}<b class="wck-t"></b></div>`
+      : '';
     const inner = `
+      ${clockHtml}
       <div class="whero">
         <div class="wicon">${iconSvg(cond, 70, haloColor)}</div>
         <div class="${tempCls}" data-t="${temp}${unit}">${temp}<small>${unit}</small></div>
@@ -2215,6 +2272,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (inner !== this._lastHtml) {
       this._elInner.innerHTML = inner;
       this._lastHtml = inner;
+      this._clockStart();
       this._startGlitchLife();  // (re)lance la vie de GLITCH sur le nouvel élément
       requestAnimationFrame(() => {
         this._measureFxH();
@@ -4430,6 +4488,20 @@ WeatherNeonCardWebgl.styles = `
     transition:background .8s ease; }
   .winner { position:relative; z-index:2; padding:10px 14px 9px; }
   .whero { display:flex; align-items:center; gap:10px; }
+  /* bandeau horloge (show_clock) : filet sous le bandeau, couleur = accent */
+  .wclock { display:flex; align-items:baseline; gap:10px; margin:0 2px 9px; padding-bottom:10px;
+    border-bottom:1px solid color-mix(in srgb, var(--acc) 24%, transparent); }
+  /* le <svg> de defs (filtre canicule) est en ligne dans ha-card (display:block) : il ouvre
+     une bande vide de ~21 px au-dessus de .winner, qui decentre l'heure dans le bandeau */
+  ha-card.wck-on .wheat-defs { position:absolute; }
+  .wck-left { justify-content:flex-start; }
+  .wck-center { justify-content:center; }
+  .wck-d { font-size:10px; font-weight:600; letter-spacing:1.4px; text-transform:uppercase; opacity:.62;
+    white-space:nowrap; }
+  .wck-t { font-size:calc(var(--wck-size, 18) * 1px); font-weight:700; letter-spacing:1.5px; line-height:1;
+    font-variant-numeric:tabular-nums; color:#fff;
+    text-shadow:0 0 3px rgba(255,255,255,.85), 0 0 10px var(--acc),
+      0 0 24px color-mix(in srgb, var(--acc) 45%, transparent); }
   .wicon { flex:none; }
   /* temp : glow multi-couches (calé sur dual-thermo-card), couleur = accent */
   /* 50px -> 44px (vu sur telephone) : la temperature poussait la
@@ -5359,6 +5431,15 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._toggle('show_wind', 'Vent', true);
       this._toggle('show_pressure', 'Pression', true);
       this._toggle('show_atmo', 'Bloc air/pollens', true);
+    });
+
+    this._group('Horloge', false, () => {
+      this._toggle('show_clock', "Afficher l'heure (bandeau en haut)", false);
+      this._select('clock_align', 'Position', [{ value: 'left', label: _t('À gauche') }], 'Centré (défaut)');
+      this._select('clock_format', 'Format', [{ value: '12h', label: '12 h' }, { value: '24h', label: '24 h' }], 'Auto (réglage HA)');
+      this._toggle('clock_date', 'Afficher la date', true);
+      this._toggle('clock_seconds', 'Afficher les secondes', false);
+      this._number('clock_size', "Taille de l'heure (px)", { min: 10, max: 60, step: 1, ph: '18' });
     });
 
     this._group('Effets généraux', false, () => {
