@@ -38,7 +38,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.1.1';
+const VERSION = '3.1.2';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -252,7 +252,7 @@ const _flake = (x, y, c = GCY, dur = 2.6, delay = 0) =>
        ${[0, 60, 120].map(a => `<line x1="${(-3.2 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y1="${(-3.2 * Math.sin(a * Math.PI / 180)).toFixed(1)}" x2="${(3.2 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(3.2 * Math.sin(a * Math.PI / 180)).toFixed(1)}"/>`).join('')}
      </g></g>`;
 
-// SOLEIL V1 (validé par l'auteur) : cœur dégradé radial + rayons triangulaires FIXES
+// SOLEIL V1 : cœur dégradé radial + rayons triangulaires FIXES
 // (pas de rotation) + halo qui pulse. cx/cy = centre, sc = échelle (1 = pleine icône).
 const _sun = (cx = 50, cy = 48, sc = 1) => {
   const rays = [...Array(12)].map((_, i) => {
@@ -300,8 +300,8 @@ function _stripSmil(svg) {
 // Cache d'icônes : les strings SVG sont déterministes par (cond, taille, halo, kanji)
 // → on ne les reconstruit (ni ne repasse la regex _stripSmil) qu'une fois.
 const ICON_CACHE = new Map();
-// withKanji défaut FALSE depuis la 3.1.1 : l'auteur a fait retirer le petit kanji en
-// haut-gauche de l'icône (il restait le watermark de fond, lui, inchangé). Passer
+// withKanji défaut FALSE depuis la 3.1.1 : plus de petit kanji en haut-gauche
+// de l'icône (le watermark de fond reste inchangé). Passer
 // `true` à l'appel le remet — la table KANJI et kanji() sont conservées exprès.
 function iconSvg(condition, size, haloColor, withKanji = false) {
   const key = `${condition}|${size}|${haloColor || ''}|${withKanji ? 1 : 0}`;
@@ -374,7 +374,7 @@ function glitchHtml(cond, mainColor = '#4AF2A1') {
 // générateurs de particules réutilisables (n = nombre, opacité optionnelle pour les "annonces")
 const _rainSpans = (n, op = 1) => [...Array(n)].map((_, i) =>
   `<span class="wfx-rain" style="left:${(i * 6.3) % 100}%;animation-delay:${(i % 7) * 0.13}s;animation-duration:${0.7 + (i % 4) * 0.18}s;opacity:${op}"></span>`).join('');
-// NEIGE PARALLAXE (technique radial-gradient trouvée par l'auteur) : on génère UNE tuile
+// NEIGE PARALLAXE (technique radial-gradient) : on génère UNE tuile
 // carrée de N flocons figés (radial-gradients empilés), puis 3 calques .wsnowfield
 // /:before/:after la font défiler à 3 vitesses+blurs+opacités → effet de profondeur.
 // Bien plus léger que des dizaines de spans : 3 éléments, juste background-position animé.
@@ -452,7 +452,7 @@ const MINI_ICONS = {
   wind:     `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/><path d="M3 11h7"/></svg>`,
   humidity: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 3.1S6 9.5 6 14a6 6 0 0 0 12 0c0-4.5-6-10.9-6-10.9m0 16.4a4 4 0 0 1-4-4c0-.4.3-.7.7-.7s.7.3.7.7a2.6 2.6 0 0 0 2.6 2.6c.4 0 .7.3.7.7s-.3.7-.7.7"/></svg>`,
   pressure: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18a8 8 0 1 1 16 0"/><line x1="12" y1="14" x2="15.5" y2="10.5"/></svg>`,
-  // qualité de l'air : LE biohazard officiel (SVG Wikimedia fourni par l'auteur), silhouette pleine.
+  // qualité de l'air : LE biohazard officiel (SVG Wikimedia), silhouette pleine.
   // Pour rester lisible en petit : disque de fond couleur Atmo (currentColor) + la silhouette
   // biohazard "creusée" par-dessus dans une couleur sombre → les 3 lobes ressortent.
   // ids renommés bh-* (évite collisions globales).
@@ -484,8 +484,7 @@ const SKY = {
 const COND_FR = {
   'sunny': 'Ensoleillé', 'clear-night': 'Nuit claire', 'partlycloudy': 'Partiellement nuageux',
   // Les variantes nocturnes ont leur PROPRE libelle : afficher << Partiellement nuageux >>
-  // a 23 h perd l'info que la card vient justement de basculer en nuit. Corrige
-  // directement dans la card -webgl le 2026-08-17, remonte ici pour ne pas le reperdre.
+  // a 23 h perd l'info que la card vient justement de basculer en nuit.
   'partlycloudy-night': 'Nuit nuageuse', 'rainy-night': 'Pluie nocturne',
   'cloudy': 'Nuageux', 'rainy': 'Pluie', 'pouring': 'Forte pluie', 'lightning': 'Orage',
   'lightning-rainy': 'Orage pluvieux', 'snowy': 'Neige', 'snowy-rainy': 'Pluie et neige',
@@ -535,7 +534,7 @@ const _EN = {
  "Bloc air/pollens": "Air/pollen block",
  "Brassage": "Mixing",
  "Brouillard": "Fog",
- "Brouillard billboards (nappes WebGL) — réglages du banc du 21/09.": "Billboard fog (WebGL layers) — settings from the 21/09 test bench.",
+ "Brouillard billboards (nappes WebGL).": "Billboard fog (WebGL layers).",
  "Brouillard billboards — nappe basse": "Billboard fog — ground layer",
  "Brouillard billboards — niveau": "Billboard fog — level",
  "Brouillard billboards — nombre": "Billboard fog — count",

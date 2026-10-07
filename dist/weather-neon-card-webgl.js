@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.3.1-webgl';
+const VERSION = '3.3.2-webgl';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -47,14 +47,14 @@ const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
 const WNC_IS_LOW_POWER = WNC_IS_IPAD || /iPhone|iPad|iPod|Android|Mobile|HomeAssistant/i.test(navigator.userAgent);
 
 // ═══════════════════════════════════════════════════════
-//  CONTEXTE WEBGL UNIQUE (v3.2.0, 2026-10-01)
+//  CONTEXTE WEBGL UNIQUE (v3.2.0)
 // ═══════════════════════════════════════════════════════
 // Chromium plafonne les contextes WebGL actifs d'une page a 8 sous Android (16
 // ailleurs) et, au-dela, evince le MOINS RECEMMENT UTILISE (plus petit flush id,
 // webgl_rendering_context_base.cc OldestContext). Cette card en ouvrait jusqu'a 4
 // (ciel, fx, lune, aurore), detruits puis recrees a chaque detachement : sur le
 // Pixel, l'app HA depassait 8 et nixie / la lune devenaient blanches (29 WARNING
-// mesures dans la WebView, 01/10/2026). Le vieil iPad, lui, a 16.
+// dans la WebView). Le vieil iPad, lui, a 16.
 // Desormais UN contexte pour toutes les couches ET toutes les instances, sur un
 // canvas hors DOM qui survit aux detachements. Chaque couche y dessine puis est
 // recopiee (drawImage, dans la meme tache) dans SON canvas, devenu un canvas 2D :
@@ -233,9 +233,7 @@ function buildConfig(raw) {
     reactive_bg:   raw.reactive_bg   ?? false,  // défaut: laisse le fond/glow du thème (card-mod)
     alert_entity:  raw.alert_entity  || null,  // ex: sensor.<dept>_weather_alert (vigilance MF)
     // ── ciel WebGL (variante webgl) ──────────────────────────────────────────
-    // Valeurs reglees a l'oeil au banc d'essai (ha-card-preview-bench,
-    // .preview-tooling/weather-neon-card-webgl/sky_bench.html, 2026-08-10).
-    // Ne pas les rechoisir au juge.
+    // Constantes ajustees visuellement : ne pas les modifier sans reverifier le rendu.
     sky:           raw.sky           ?? true,   // la couche GL elle-meme
     sky_opacite:   _n(raw.sky_opacite,   0.55), // maitre-volume de ce que le ciel AJOUTE (nuages, brume, halo)
     sky_fond:      _n(raw.sky_fond,      0.00), // le degrade de fond, A PART : 0 = l'image du theme est intacte
@@ -252,24 +250,20 @@ function buildConfig(raw) {
     sky_profondeur:_n(raw.sky_profondeur,1.00),
     sky_saturation:_n(raw.sky_saturation,1.00), // GAIN
     sky_grain:     _n(raw.sky_grain,     0.40), // OBLIGATOIRE : sans tramage, un degrade plein cadre bande
-    // ── nuit : un nuage EST une ombre, pas un ciel diurne timide (l'auteur, 2026-08-18,
-    // photo Tokyo). Le lisere ET le halo de l'astre sont module par la VRAIE phase
+    // ── nuit : un nuage EST une ombre, pas un ciel diurne timide. Le lisere ET le halo de l'astre sont module par la VRAIE phase
     // lunaire du jour (moonPhase(), meme formule que le disque texture) -- pas un
     // reglage manuel : a nouvelle lune, plus de reflet sur les nuages ni de halo.
-    // 3.00 = choix de l'auteur (2026-08-18), au-dessus du 2.20 valide au banc. Raison : ce
-    // reglage est MULTIPLIE par moonGain, l'illumination reelle de la lune. Le banc
-    // tournait a phase 0.48 en manuel ; le ciel de la card suit la vraie lune (0.31 ce
-    // soir-la), donc 2.20 n'arrivait au shader qu'a ~0.68. Monter a 3.00 compense.
+    // 3.00 et pas plus bas : ce reglage est MULTIPLIE par moonGain, l'illumination
+    // reelle de la lune, qui le reduit fortement hors pleine lune.
     // ⚠️ 3.00 est la BORNE du clamp GLSL (clamp(uNightLit,0.0,3.0)) : plus haut n'aurait
     // aucun effet. Pour aller au-dela il faudrait relever le clamp dans sky_shader.py.
     sky_nuit_reflet:  _n(raw.sky_nuit_reflet,  3.00), // gain du lisere sur la face tournee vers la lune
     sky_nuit_plancher:_n(raw.sky_nuit_plancher,0.35), // plancher d'opacite du fond la nuit (s'ajoute a sky_fond)
     sky_nuit_portee:  _n(raw.sky_nuit_portee,  1.80), // portee du halo lunaire sur les nuages (grand = serre)
     // ── effets meteo WebGL (post-process) ────────────────────────────────────
-    // Valeurs VALIDEES PAR l'auteur au banc cumul (weather_cumul_bench.html), reprises
-    // telles quelles -- ne pas les rechoisir au juge.
+    // Constantes ajustees visuellement : ne pas les modifier sans reverifier le rendu.
     fx_gl:         raw.fx_gl         ?? true,   // la passe post-process elle-meme
-    // pluie sur vitre (validee 2026-08-09) : lentille + rack focus
+    // pluie sur vitre : lentille + rack focus
     fx_pluie:        _n(raw.fx_pluie,        0.70),
     // meme idiome que fx_aurore_toujours : force l'effet visible hors de sa condition
     // meteo reelle, pour le regler depuis l'editeur sans attendre la bonne meteo.
@@ -285,10 +279,9 @@ function buildConfig(raw) {
     fx_brouillard:   _n(raw.fx_brouillard,   0.80),
     fx_brouillard_toujours: raw.fx_brouillard_toujours ?? false,
     // ANTI-BROUILLARDS (v3.2.1) : intensite du detachement des textes sous le voile,
-    // 0 = eteints. Point de depart a regler in situ par l'auteur, pas une valeur de banc.
+    // 0 = eteints.
     fx_antibrouillard: _n(raw.fx_antibrouillard, 0.70),
-    // nappes billboards du brouillard -- reglages valides par l'auteur au banc (artefact
-    // ykob), fogx_level pilote le maitre-volume (voile plat ET billboards)
+    // nappes billboards du brouillard -- fogx_level pilote le maitre-volume (voile plat ET billboards)
     fogx_level:      _n(raw.fogx_level,      0.80),
     fogx_count:      _n(raw.fogx_count,      150),
     fogx_size:       _n(raw.fogx_size,       1.30),
@@ -329,9 +322,9 @@ function buildConfig(raw) {
     fx_givre_trait:  _n(raw.fx_givre_trait,  0.55),
     fx_givre_grain:  _n(raw.fx_givre_grain,  0.55),
     fx_givre_sinu:   _n(raw.fx_givre_sinu,   0.45),
-    // LUNE photo (banc moon_bench.html, volet droit -- valeurs = defauts des curseurs).
+    // LUNE photo.
     // Remplace le sprite SVG (2 arcs) par l'albedo photo + terminateur calcule.
-    // `taille` monte de 30 (SVG) a 96 : le banc a ete regle a ce diametre, et le
+    // `taille` monte de 30 (SVG) a 96 : le
     // relief des crateres ne se lit pas a 30 px. Le halo deborde en plus du disque.
     fx_lune:         raw.fx_lune ?? true,
     fx_lune_toujours: raw.fx_lune_toujours ?? false,  // force visible meme hors nuit
@@ -347,8 +340,7 @@ function buildConfig(raw) {
     fx_lune_halok:   _n(raw.fx_lune_halok,   0.40),
     fx_lune_incl:    _n(raw.fx_lune_incl,    -18),
     fx_lune_grain:   _n(raw.fx_lune_grain,   0.25),
-    // neige GL_POINTS (v3.3.0, banc weather_snow_points_bench). Valeurs = reglages de
-    // l'auteur au banc le 02/10/2026 (snowx_*). Elle tombe DEHORS, derriere la vitre :
+    // neige GL_POINTS (v3.3.0, cles snowx_*). Elle tombe DEHORS, derriere la vitre :
     // rendue dans son FBO puis posee SOUS les effets de vitre (#define FX_SNOW), donc
     // deformee par les gouttes et voilee par la brume. La neige 2D (_drawSnow) ne
     // sert plus que de repli et lit les memes cles.
@@ -379,7 +371,7 @@ function buildConfig(raw) {
     fx_chaleur_teint:_n(raw.fx_chaleur_teint,0.45),
     fx_chaleur_sat:  _n(raw.fx_chaleur_sat,  0.30),
     fx_chaleur_grain:_n(raw.fx_chaleur_grain,0.25),
-    // arbitrage des CUMULS (banc cumul) : deux effets sur la meme vitre se partagent
+    // arbitrage des CUMULS : deux effets sur la meme vitre se partagent
     fx_plafond:      _n(raw.fx_plafond,      1.00),
     fx_partage_vitre:_n(raw.fx_partage_vitre,0.50),
     fx_recul_brume:  _n(raw.fx_recul_brume,  0.60),
@@ -393,8 +385,7 @@ function buildConfig(raw) {
     // pills sur une ligne) sans etre trop grande pour une colonne de dashboard.
     largeur_ref:     _n(raw.largeur_ref,     380),
     // ── AURORE BOREALE : EASTER EGG ──────────────────────────────────────────
-    // Shader : aurora_shader.py. Valeurs VALIDEES PAR l'auteur au banc
-    // (aurora_bench.html, 2026-08-17) -- ne pas les rechoisir au juge.
+    // Constantes ajustees visuellement : ne pas les modifier sans reverifier le rendu.
     // ⚠️ Ce n'est PAS un effet meteo : il ne se declenche que sur LUNE NOIRE +
     // ciel DEGAGE + nuit (cf le verdict `aurNow`). Ne jamais l'ouvrir a toutes les
     // nuits claires : c'est ce qui le ferait mentir, et la card ne ment nulle part
@@ -407,8 +398,7 @@ function buildConfig(raw) {
     fx_aurore_lune:  _n(raw.fx_aurore_lune,  0.07),
     // EASTER EGG E.T. : le velo passe devant la PLEINE lune (nuit + ciel degage),
     // une fois quand la card s'affiche, puis a chaque tap sur la lune. Ombre chinoise
-    // pure. Valeurs reglees au banc et_bench.html par l'auteur le 25/09/2026 : ne pas
-    // les rechoisir au juge. `fx_et_toujours` = mode demo, jamais en prod.
+    // pure. `fx_et_toujours` = mode demo, jamais en prod.
     fx_et:          raw.fx_et ?? true,
     fx_et_toujours: raw.fx_et_toujours ?? false,
     // fraction eclairee du disque au-dessus de laquelle la lune est "pleine"
@@ -422,8 +412,7 @@ function buildConfig(raw) {
     fx_et_arc:      _n(raw.fx_et_arc,      0.12),   // bombe de la trajectoire (x R)
     fx_et_cabre:    _n(raw.fx_et_cabre,    -6),     // inclinaison ajoutee (deg)
     fx_et_ondule:   _n(raw.fx_et_ondule,   0.50),   // battement de la cape
-    // 0.563 et pas le 0.55 du banc : dans la card la couche fait ~234 px de haut,
-    // et l'auteur a demande de remonter le rideau de 3 px (3/234 ~ 0.013).
+    // 0.563 : rideau remonte de 3 px sur une couche de ~234 px (3/234 ~ 0.013).
     fx_aurore_base:      _n(raw.fx_aurore_base,      0.563),
     fx_aurore_amplitude: _n(raw.fx_aurore_amplitude, 0.24),
     fx_aurore_sigma:     _n(raw.fx_aurore_sigma,     0.90),
@@ -630,7 +619,7 @@ const _flake = (x, y, c = GCY, dur = 2.6, delay = 0) =>
        ${[0, 60, 120].map(a => `<line x1="${(-3.2 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y1="${(-3.2 * Math.sin(a * Math.PI / 180)).toFixed(1)}" x2="${(3.2 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(3.2 * Math.sin(a * Math.PI / 180)).toFixed(1)}"/>`).join('')}
      </g></g>`;
 
-// SOLEIL V1 (validé par l'auteur) : cœur dégradé radial + rayons triangulaires FIXES
+// SOLEIL V1 : cœur dégradé radial + rayons triangulaires FIXES
 // (pas de rotation) + halo qui pulse. cx/cy = centre, sc = échelle (1 = pleine icône).
 const _sun = (cx = 50, cy = 48, sc = 1) => {
   const rays = [...Array(12)].map((_, i) => {
@@ -773,7 +762,7 @@ function glitchHtml(cond, mainColor = '#4AF2A1') {
 // générateurs de particules réutilisables (n = nombre, opacité optionnelle pour les "annonces")
 const _rainSpans = (n, op = 1) => [...Array(n)].map((_, i) =>
   `<span class="wfx-rain" style="left:${(i * 6.3) % 100}%;animation-delay:${(i % 7) * 0.13}s;animation-duration:${0.7 + (i % 4) * 0.18}s;opacity:${op}"></span>`).join('');
-// NEIGE PARALLAXE (technique radial-gradient trouvée par l'auteur) : on génère UNE tuile
+// NEIGE PARALLAXE (technique radial-gradient) : on génère UNE tuile
 // carrée de N flocons figés (radial-gradients empilés), puis 3 calques .wsnowfield
 // /:before/:after la font défiler à 3 vitesses+blurs+opacités → effet de profondeur.
 // Bien plus léger que des dizaines de spans : 3 éléments, juste background-position animé.
@@ -830,8 +819,7 @@ function starRng(a) {
 // re-render ; Math.random() le ferait plusieurs fois par minute.
 function starSeed() { return Math.floor(Date.now() / 864e5) * 2654435761; }
 
-// Réglages arbitrés à l'œil par l'auteur au banc ha-card-preview-bench, 31/08/2026.
-// Ce ne sont pas des valeurs calculées : ne pas les « arrondir ».
+// Constantes ajustées visuellement : ne pas les « arrondir ».
 const STARS = {
   n: 115,        // nombre d'étoiles
   bias: 0.55,    // tassement vers le haut de la card
@@ -922,7 +910,7 @@ const MINI_ICONS = {
   wind:     `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 14h15a3 3 0 1 1-3 3"/><path d="M3 11h7"/></svg>`,
   humidity: `<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><path d="M12 3.1S6 9.5 6 14a6 6 0 0 0 12 0c0-4.5-6-10.9-6-10.9m0 16.4a4 4 0 0 1-4-4c0-.4.3-.7.7-.7s.7.3.7.7a2.6 2.6 0 0 0 2.6 2.6c.4 0 .7.3.7.7s-.3.7-.7.7"/></svg>`,
   pressure: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18a8 8 0 1 1 16 0"/><line x1="12" y1="14" x2="15.5" y2="10.5"/></svg>`,
-  // qualité de l'air : LE biohazard officiel (SVG Wikimedia fourni par l'auteur), silhouette pleine.
+  // qualité de l'air : LE biohazard officiel (SVG Wikimedia), silhouette pleine.
   // Pour rester lisible en petit : disque de fond couleur Atmo (currentColor) + la silhouette
   // biohazard "creusée" par-dessus dans une couleur sombre → les 3 lobes ressortent.
   // ids renommés bh-* (évite collisions globales).
@@ -964,8 +952,7 @@ function escHtml(v) {
 const COND_FR = {
   'sunny': 'Ensoleillé', 'clear-night': 'Nuit claire', 'partlycloudy': 'Partiellement nuageux',
   // Les variantes nocturnes ont leur PROPRE libellé : afficher « Partiellement nuageux »
-  // à 23 h perd l'info que la card vient justement de basculer en nuit. Corrigé
-  // directement dans la card -webgl le 2026-08-17, remonté ici pour ne pas le reperdre.
+  // à 23 h perd l'info que la card vient justement de basculer en nuit.
   'partlycloudy-night': 'Nuit nuageuse', 'rainy-night': 'Pluie nocturne',
   'cloudy': 'Nuageux', 'rainy': 'Pluie', 'pouring': 'Forte pluie', 'lightning': 'Orage',
   'lightning-rainy': 'Orage pluvieux', 'snowy': 'Neige', 'snowy-rainy': 'Pluie et neige',
@@ -1015,7 +1002,7 @@ const _EN = {
  "Bloc air/pollens": "Air/pollen block",
  "Brassage": "Mixing",
  "Brouillard": "Fog",
- "Brouillard billboards (nappes WebGL) — réglages du banc du 21/09.": "Billboard fog (WebGL layers) — settings from the 21/09 test bench.",
+ "Brouillard billboards (nappes WebGL).": "Billboard fog (WebGL layers).",
  "Brouillard billboards — nappe basse": "Billboard fog — ground layer",
  "Brouillard billboards — niveau": "Billboard fog — level",
  "Brouillard billboards — nombre": "Billboard fog — count",
@@ -1244,7 +1231,7 @@ const _setLang = (h) => {
 
 class WeatherNeonCardWebgl extends HTMLElement {
   // px : marge entre le bas des effets 2D et le trait des previsions.
-  // A ZERO apres mesure du 2026-08-18. La pluie de fond s'arretait DEJA pile sur le
+  // A ZERO. La pluie de fond s'arretait DEJA pile sur le
   // trait (dernier pixel de trait a 112 pour un divider a 118) ; un A/B a 0 / 5 / 20 px
   // sur la meme frame ne montre AUCUNE difference visible -- la vitre du shader couvre
   // toute la card et noie la frontiere. Le curseur reste ici, il ne sert juste a rien.
@@ -1364,7 +1351,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._elFx = this.shadowRoot.querySelector('.wfxlayer');
     this._elMoonGl = this.shadowRoot.querySelector('.wmoongl');
     this._elEt = this.shadowRoot.querySelector('.wet');
-    // PAS de _moonInit() ici (2026-08-19) : en plein jour ce contexte restait ouvert
+    // PAS de _moonInit() ici : en plein jour ce contexte restait ouvert
     // a ne rien peindre (_moonDraw sort sur !_moonOn). _moonEnsure() l'ouvre quand la
     // nuit tombe -- il savait deja CREER a la demande, pas RELACHER.
     // Le jour, _moonStop() retire [moongl] : le sprite SVG reprend la main, le repli
@@ -1372,7 +1359,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // (le shader echantillonne une photo : le SVG ne la remplace pas).
     this._elFxCv = this.shadowRoot.querySelector('.wfxmain');
     this._elFxGl = this.shadowRoot.querySelector('.wfxgl');
-    // PAS d'init ici (2026-08-19). Le contexte FX ne sert QUE si un effet est actif
+    // PAS d'init ici. Le contexte FX ne sert QUE si un effet est actif
     // (cf _fxActive : pluie/brouillard/vent/givre/canicule) -- l'ouvrir au montage
     // brulait un contexte sur ~16 par beau temps, pour un shader qui sortait aussitot
     // par sa garde ligne 1 de _fxGlDraw. _fxGlEnsure() l'ouvre a la demande.
@@ -1611,8 +1598,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // Neige 2D = REPLI : seulement si la neige GL_POINTS n'est pas dessinee cette
     // frame (meme predicat _snowGlOn que _fxGlDraw, sinon double neige ou aucune).
     // Peinte APRES les autres effets 2D mais AVANT la passe GL : elle fait partie de
-    // la scene qu'on regarde a travers la vitre. TOUTE la card, previsions comprises
-    // (l'auteur, 02/10) : pas de coupure nette au divider comme la pluie.
+    // la scene qu'on regarde a travers la vitre. TOUTE la card, previsions comprises :
+    // pas de coupure nette au divider comme la pluie.
     if (this._fxSnowLvl > 0 && !this._snowGlOn()) {
       this._drawSnow(ctx, W, H, now);
     }
@@ -1627,7 +1614,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const speed = 0.4 + intensity * 1.4;               // vitesse globale du flux
 
     // 1) NAPPES de brume : bandes horizontales ondulées, gradient doux, dérivent.
-    // DESACTIVEES (bande grise / bord dur signale par l'auteur le 21/09) — code garde intact,
+    // DESACTIVEES (bande grise / bord dur) — code garde intact,
     // boucle simplement sautee via nSheets=0. Particules (partie 2 ci-dessous) toujours actives.
     const nSheets = false ? (WNC_IS_LOW_POWER ? 1 : 2 + Math.round(intensity * 2)) : 0;  // 1 (tablette) / 2-4
     for (let s = 0; s < nSheets; s++) {
@@ -1636,8 +1623,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
       const cy = sh.y * H;
       // Le degrade doit couvrir l'extent REEL rempli (cy -> cy+thick), pas cy-thick -> cy+thick :
       // sinon la moitie fade-in (cy-thick -> cy) n'est jamais dessinee et la nappe demarre
-      // a alpha MAX des sa premiere ligne -- bord dur en haut, vu par l'auteur comme "gris,
-      // aliasing marque" (diagnostic differentiel + dump uSharp du 21/09).
+      // a alpha MAX des sa premiere ligne -- bord dur en haut.
       const grad = ctx.createLinearGradient(0, cy, 0, cy + sh.thick);
       grad.addColorStop(0, 'rgba(150,210,255,0)');
       grad.addColorStop(0.5, `rgba(170,225,255,${(0.05 + intensity * 0.07).toFixed(3)})`);
@@ -1973,7 +1959,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._heatRAF) { cancelAnimationFrame(this._heatRAF); this._heatRAF = null; }
   }
 
-  // Met le BLOC COMPLET a l'echelle (l'auteur : pas les elements un par un).
+  // Met le BLOC COMPLET a l'echelle (pas les elements un par un).
   // ha-card est figee a la largeur de reference et le wrapper .wscale la reduit
   // d'un seul tenant. k plafonne a 1 : on retrecit, on n'agrandit jamais.
   _applyScale() {
@@ -1995,7 +1981,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // Un element transforme occupe sa hauteur NON scalee dans le flux : sans
     // compensation, un vide egal a (1-k) x hauteur reste sous la card.
     // On l'absorbe par une MARGE NEGATIVE, surtout pas en fixant la hauteur du
-    // wrapper. Signale par l'auteur (2026-08-17) : "les previsions ont disparu".
+    // wrapper.
     // Avec `height: var(--wsc-h)`, le wrapper contraint ha-card, qui se remesure
     // plus courte, ce qui re-reduit --wsc-h au tour de ResizeObserver suivant :
     // boucle de retroaction qui rogne le bas de la card (les pills de previsions).
@@ -2018,7 +2004,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // une seconde fois et les effets s'arretent trop haut.
     const k = this._scaleK || 1;
     // FX_GAP : on s'arrete quelques pixels AVANT le trait des previsions, pas dessus.
-    // Mesure du 2026-08-18 : --fx-h valait exactement le haut de .wforecast, or le
+    // --fx-h valait exactement le haut de .wforecast, or le
     // trait EST son ::before en top:0 -- la pluie mourait donc pile sur la ligne, et
     // les deux traits se disputaient le meme pixel. Un retrait laisse respirer le
     // divider et rend la coupure moins franche. Vaut aussi pour .wflash et le halo
@@ -2195,7 +2181,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     let condLabel = condGeneric;
     // ⚠️ La nuit, on garde le générique. Le capteur Météo-France décrit le temps DU JOUR
     // et ne connaît pas la nuit : il renvoie « Ensoleillé » à 21h, à côté de la lune et
-    // des étoiles (constaté le 31/08/2026). Le générique, lui, part de `cond` déjà passé
+    // des étoiles. Le générique, lui, part de `cond` déjà passé
     // par NIGHT_OF → « Nuit claire ». Une couverture nuageuse reste visible via l'icône,
     // le fond et les FX, qui eux ont bien basculé.
     if (this._config.condition_label && !(this._config.night_from_sun && this._isNight)) {
@@ -2247,14 +2233,13 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // météo" sans surchauffer.
     const fxOn = this._config.particles;
     this._rainLevel = fxOn ? rainLevel : 0;
-    // l'auteur (2026-08-17) : « pour la pluie en dessous de 50% on se contentera des gouttes
-    // sur la vitre, pas l'autre effet de pluie ». Sous les 50 % de risque, on garde les
+    // Sous les 50 % de risque, on garde les
     // gouttes sur la vitre — passe GL, qui lit `_rainLevel` — et on éteint les traits +
     // éclaboussures du canvas 2D.
-    // ⚠️ 2026-08-19 : la garde initiale exigeait AUSSI une condition SÈCHE
+    // ⚠️ La garde n'exige PAS une condition SÈCHE
     // (`!WET_CONDS.has(cond)`), ce qui réduisait la règle au seul cas « annonce sur ciel
     // sec ». Dès qu'il pleuvait pour de vrai — `rainy` à 20 % de risque, cas observé —
-    // la règle ne s'appliquait plus et l'auteur voyait les gouttes ET l'averse. On ne garde
+    // la règle ne s'appliquerait plus (gouttes ET averse). On ne garde
     // donc que les conditions où couper l'averse serait FAUX :
     //   • `pouring` : il tombe des cordes, un pourcentage bas serait une incohérence de la
     //     source, pas un signal à lisser ;
@@ -2264,9 +2249,9 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // vitre, y couper le 2D ne laisserait plus rien du tout. La garde s'en charge seule,
     // pas besoin de deux versions de ce calcul.
     // ⚠️ `_fxCapable` (variante -webgl) et NON `_fxGl` (contexte vivant) : depuis le
-    // lazy-init du 19/08 le contexte FX n'existe que si un effet tourne deja. Tester
+    // lazy-init le contexte FX n'existe que si un effet tourne deja. Tester
     // `_fxGl` ici créait un cercle — pas de contexte donc pas de mode gouttes-seules,
-    // donc l'averse 2D, donc le bug de la veille revenu. Sur la card de BASE (sans
+    // donc l'averse 2D. Sur la card de BASE (sans
     // WebGL) `_fxCapable` est `undefined` → faux : elle garde son averse, comme avant.
     this._rainGlassOnly = !!(this._fxCapable && this._config.fx_pluie > 0
       && cond !== 'pouring' && !STORM_CONDS.has(cond) && (ex.rainCh || 0) < 50);
@@ -2290,7 +2275,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // NUIT. On se base sur le VERDICT (`_isNight`, luminosite mesuree) et pas seulement
     // sur NIGHT_CONDS : la condition peut etre 'rainy-night', 'cloudy'... qui n y sont pas,
     // et on perdait la lune ces soirs-la. Or c est precisement pour l avoir TOUS LES SOIRS
-    // que ce truc existe (l'auteur, 2026-08-17).
+    // que ce truc existe.
     const nightNow = this._isNight || NIGHT_CONDS.has(cond);
     if (fxOn && nightNow) this._startNight(); else this._stopNight();
     this._moonOn = !!(this._config.fx_lune && (nightNow || this._config.fx_lune_toujours));
@@ -2320,8 +2305,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
       const wet = WET_CONDS.has(cond) || STORM_CONDS.has(cond);
       // 'cloudy' = fourre-tout << les gouttes CSS sont inutiles, le canvas s en charge >>.
       // /!\ De NUIT il effacait aussi les etoiles ET le sprite lune : particlesHtml('cloudy')
-      // renvoie ''. Vecu le 2026-08-17 : rain_chance 40% -> rainLevel 0.16 -> couche FX vide
-      // toute la soiree (fxKey mesure = "cloudy|40|0|||d17"). On neutralise donc la pluie CSS
+      // renvoie '' : rain_chance 40% -> rainLevel 0.16 -> couche FX vide
+      // toute la soiree. On neutralise donc la pluie CSS
       // vers la variante NOCTURNE quand il fait nuit, jamais vers le profil diurne.
       const mute = nightNow ? 'partlycloudy-night' : 'cloudy';
       // `_rainGlassOnly` (< 50 % de risque) coupe le canvas 2D ; sans ce terme la couche
@@ -2368,7 +2353,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // demo comprise. --wfk = intensite. CSS : .winner.wfog-on.
     // v3.3.0 : allumes aussi quand il NEIGE (meme predicat que _fxActive().snow, GL
     // ou repli 2D) -- la neige couvre toute la card, previsions comprises, et les
-    // flocons passent sur les textes (l'auteur, 02/10).
+    // flocons passent sur les textes.
     const fogOn  = (this._fogLevel  || 0) > 0 && this._config.fx_brouillard > 0;
     const snowOn = (this._fxSnowLvl || 0) > 0 && this._config.fx_neige > 0;
     const fogLights = (fogOn || snowOn) && this._config.fx_antibrouillard > 0;
@@ -2515,7 +2500,7 @@ void main(){
   float dayW  =smoothstep(-0.02,0.30,alt);         // plein jour
   // cloche autour de l horizon. ⚠️ pas trop etroite : a 19h30 en aout le soleil est deja
   // a -34 deg et le ciel est TOUJOURS embrase. Un exp(-alt*alt*26) tuait le crepuscule
-  // partout sauf a l instant exact du coucher -> ciel gris toute la soiree (vecu).
+  // partout sauf a l instant exact du coucher -> ciel gris toute la soiree.
   float duskW =exp(-alt*alt*7.0);
   vec3 zNight=vec3(0.024,0.039,0.094), hNight=vec3(0.075,0.110,0.200);
   vec3 zDay  =vec3(0.122,0.290,0.420), hDay  =vec3(0.357,0.639,0.812);
@@ -2548,7 +2533,7 @@ void main(){
   // SOMBRE. Comme le halo est justement la zone la plus lumineuse, c est elle que
   // uGrey ecrasait le plus fort : par temps de pluie (uGrey=0.45) le disque devenait
   // PLUS SOMBRE que le ciel autour -- un "trou noir" au-dessus de la temperature
-  // (constate par l'auteur sur capture, 2026-08-17). On garde donc glow pour l alpha
+  // On garde donc glow pour l alpha
   // et on reinjecte la lumiere APRES la grisaille. Un soleil derriere des nuages
   // reste lumineux : le voiler, oui ; l eteindre, non.
 
@@ -2557,7 +2542,7 @@ void main(){
   // taille au zenith et au loin -> ca lit comme un papier peint, pas comme un ciel.
   // ⚠️ BORNER la distance. Sans le clamp, 1/ah part a 250 au ras de l horizon contre 1.6
   // au zenith : le bruit defile si vite sur les derniers pixels que tout le ciel lit
-  // comme des trainees de fumee horizontales, pas comme des nuages (vecu le 2026-08-10).
+  // comme des trainees de fumee horizontales, pas comme des nuages.
   float ah=uv.y-hy;
   float d=1.0/max(ah,0.07);                  // distance sur le plan nuageux, plafonnee a ~14
   vec2 pl=vec2((uv.x-0.5)*d, d)*uScale*0.18;
@@ -2584,9 +2569,8 @@ void main(){
   // mixer par dayW : a dayW=0 il vaut encore 42-62% de luminosite, un bleu-gris clair,
   // pas une ombre. La nuit un nuage EST une ombre, seule sa face tournee vers la lune
   // recoit un lisere. uNightLit (defaut bas) est ce lisere -- un gain sur clDark, pas
-  // un plafond a 60% de blanc (demande de l'auteur le 2026-08-18 : "sans lumiere du soleil
-  // les nuages se voient plutot comme des ombres refletees par la lune").
-  // ⚠️ Reference Tokyo (photo l'auteur, meme jour) : SEULS les nuages colles a la lune
+  // un plafond a 60% de blanc.
+  // ⚠️ SEULS les nuages colles a la lune
   // recoivent ce lisere -- le reste du ciel, loin de l astre, reste aussi noir que le
   // fond. Un gain UNIFORME sur toute la scene "allume" tous les nuages a la fois, ce qui
   // ne ressemble a rien de reel. On pondere donc par la proximite au point lumineux 'lum'
@@ -2633,20 +2617,16 @@ void main(){
   // ── ALPHA DERIVEE DU CONTENU ──────────────────────────────────────────────
   // Avant : alpha = uOpacity PARTOUT. Donc meme un ciel parfaitement degage posait
   // un voile plein cadre, et le fond du theme (l image de ville cyberpunk) passait
-  // a la trappe. C est exactement le defaut que l'auteur reprochait deja a
-  // reactive_bg, refait en GL (constate sur capture le 2026-08-10).
+  // a la trappe (meme defaut que reactive_bg).
   // Maintenant : n est opaque que ce que le ciel AJOUTE vraiment -- les nuages, la
   // brume d horizon, le halo de l astre. Ciel degage = alpha 0 = l image passe.
   // uOpacity garde son role, mais devient un maitre-volume et non plus un voile.
   float a=clamp(cl*0.94+hz+glow,0.0,1.0)*clamp(uOpacity,0.0,1.0);
 
-  // ⚠️ LA NUIT, UN NUAGE EST OPAQUE (l'auteur, 2026-08-18 : "les nuages sont toujours
-  // teintes"). L alpha ci-dessus derive de la CLARTE du contenu -- excellent de jour,
+  // ⚠️ LA NUIT, UN NUAGE EST OPAQUE. L alpha ci-dessus derive de la CLARTE du contenu -- excellent de jour,
   // faux de nuit : un nuage nocturne est SOMBRE, donc 'cl' est faible, donc son alpha
   // est faible... et le fond du theme (ville cyberpunk violette) passe A TRAVERS le
-  // nuage, qui parait teinte en mauve. Le banc ne montrait pas le defaut : fond noir
-  // derriere, un nuage translucide y parait simplement noir -- on croyait s en etre
-  // affranchi, on l avait seulement masque.
+  // nuage, qui parait teinte en mauve. Sur fond noir le defaut est invisible.
   // Physiquement un nuage CACHE le ciel qu il soit eclaire ou non : de nuit l alpha
   // doit suivre la COUVERTURE (cl), pas la luminosite. On releve donc l opacite du
   // contenu nuageux a mesure que la nuit tombe, sans toucher au jour (dayW=1 -> a
@@ -2656,19 +2636,17 @@ void main(){
 
   // ── ...ET LE FOND, REGLABLE A PART ────────────────────────────────────────
   // uOpacity ne pilote que ce que le ciel AJOUTE. uVeil pilote le degrade de fond
-  // plein cadre -- l ancien voile, mais devenu son propre bouton (demande de l'auteur
-  // le 2026-08-10 : "jouer sur l opacite du bg independamment du sky").
+  // plein cadre -- l ancien voile, mais devenu son propre bouton.
   //   uVeil=0   -> l image de ville du theme est intacte, on ne voit que nuages+halo
   //   uVeil=1   -> ciel opaque, on retrouve le comportement d avant
   // Compose SOUS le contenu (a + (1-a)*v) et pas en max() : sinon un nuage a 0.3
   // deviendrait TRANSPARENT des que le fond monte a 0.5, au lieu de s y ajouter.
   //
   // ⚠️ PLANCHER NOCTURNE. uVeil est un reglage MANUEL fixe (sky_fond) : a une
-  // valeur basse (ex 0.15, cas l'auteur), un ciel de nuit PEU couvert (cl faible car
+  // valeur basse (ex 0.15), un ciel de nuit PEU couvert (cl faible car
   // peu de nuages au-dessus du seuil de couverture) retombe presque entierement
   // sur ce plancher -> le fond du theme domine et la nuit "a des effets mais reste
-  // transparente" (constate par l'auteur le 2026-08-18, cf reference images : nuit
-  // nuageuse dense et sombre, pas un voile leger). Le ciel DIURNE n a pas ce
+  // transparente" (une nuit nuageuse est dense et sombre, pas un voile leger). Le ciel DIURNE n a pas ce
   // probleme (le the theme est deja clair). On ajoute donc un plancher qui ne vit
   // QUE la nuit, proportionnel a (1-dayW), AVANT le veil manuel -- il s ajoute a
   // uVeil, il ne le remplace pas, donc sky_fond=0 reste "image intacte" le jour
@@ -2761,15 +2739,14 @@ void main(){
 
     if (!this._fitCanvas(cv)) return;
     // contexte partage : begin() pose viewport + blend et EFFACE (sans ce clear les
-    // frames s'accumuleraient -- lavis rose sature, vecu au temps du preserveDrawingBuffer).
+    // frames s'accumuleraient -- lavis rose sature).
     if (WNC_GL.begin(cv.width, cv.height) !== gl) return;
     WNC_GL.use(this._glP);
     const c = this._config, U = this._glU, t = (now - this._skyT0) / 1000;
     const K = WeatherNeonCardWebgl.SKY_COND[this._skyCond] ||
               WeatherNeonCardWebgl.SKY_COND['partlycloudy'];
     const sun = this._skySun();
-    // ⚠️ LA NUIT SE MESURE, ELLE NE SE CALCULE PAS (l'auteur, 2026-08-18 : "le capteur est
-    // dehors ca devrait bien aider a savoir qd il fait nuit"). La card SAIT deja qu il
+    // ⚠️ LA NUIT SE MESURE, ELLE NE SE CALCULE PAS. La card SAIT deja qu il
     // fait nuit -- `_isNight`, verdict du capteur de luminosite avec hysterese, c est lui
     // qui fait apparaitre la lune. Le ciel GL, lui, refaisait sa propre ephemeride dans
     // son coin a partir de sun.elevation : deux sources de verite pour la meme question,
@@ -2798,8 +2775,7 @@ void main(){
     // Le crepuscule s eteint AVEC le capteur, pas avec l altitude. duskW =
     // exp(-alt*alt*7) est une cloche en sin(elevation) : a -7.8 deg elle vaut
     // encore 0.88, et il faudrait -33 deg pour la fermer -- l horizon restait
-    // donc peint 75% orange TOUTE la nuit (l'auteur, 31/08 : "la photo c est le
-    // debut de la nuit, apres c est tout noir"). On ne touche pas a alt (il
+    // donc peint 75% orange TOUTE la nuit. On ne touche pas a alt (il
     // pilote dayW, le halo, la position de l astre) : on coupe le seul uniform
     // qui ne sert QU AU crepuscule. Le vrai crepuscule -- capteur encore au-
     // dessus du seuil, soleil juste sous l horizon -- garde sa bande orangee.
@@ -2845,7 +2821,7 @@ void main(){
   //    Shader : .preview-tooling/weather-neon-card-webgl/fx_shader.py
   //    ⚠️ NE PAS editer le GLSL ici : ce fichier est GENERE.
   //
-  //    Principe (valide au banc cumul) : le canvas 2D existant (.wfxmain) reste
+  //    Principe : le canvas 2D existant (.wfxmain) reste
   //    la SOURCE -- pluie/vent/brouillard/eclair continuent d'y etre peints par
   //    _fxTick, inchanges. Chaque frame on l'uploade en texture (uSharp) plus une
   //    copie floutee (uBlur), et UNE passe fullscreen applique les effets. L'orage
@@ -2877,7 +2853,7 @@ void main(){
     this._fxTex = [mkTex(0), mkTex(1), mkTex(2), mkTex(3)];
 
     // canvas hors-ecran pour la version floutee. Un SEUL blur pour tout le canvas :
-    // surtout pas un ctx.filter par trait (piege vecu au banc : rendu headless pendu).
+    // surtout pas un ctx.filter par trait (rendu headless pendu).
     this._fxBlurCv = document.createElement('canvas');
 
     WNC_GL.hold(this);
@@ -2962,7 +2938,7 @@ void main(){
 
   // fBm (5 octaves, bruit de valeur) sur un canvas NxN, alpha nul au bord et zones a
   // zero DUR a l'interieur -- casse la symetrie radiale parfaite d'un smoothstep.
-  // Verbatim du banc CCJAE5Yzr3HB47bHnKjkwQ (fonction makePuff), lui-meme un repli du
+  // Fonction makePuff, elle-meme un repli du
   // sketch ykob/sketch-threejs (fog.fs echantillonne une vraie texture PNG, inaccessible
   // ici -- meme mecanisme : alpha texture, pas gradient radial).
   _fogMakePuffTex(N) {
@@ -3000,7 +2976,7 @@ void main(){
     gl.bindFramebuffer(gl.FRAMEBUFFER, this._fogFbo);
     gl.viewport(0, 0, cvW, cvH);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.blendFunc(gl.ONE, gl.ONE);   // additif pur (banc CCJAE5Yzr3HB47bHnKjkwQ)
+    gl.blendFunc(gl.ONE, gl.ONE);   // additif pur
 
     const P = this._fogProg;
     gl.useProgram(P.pr);
@@ -3013,7 +2989,7 @@ void main(){
     gl.enableVertexAttribArray(P.aRnd);
     gl.vertexAttribPointer(P.aRnd, 3, gl.FLOAT, false, stride, 16);
 
-    // Reglages valides par l'auteur au banc (artefact ykob) : count/size/opacity/speed/
+    // Reglages : count/size/opacity/speed/
     // spin/hue/blink/ground en config fogx_*, level = maitre-volume (fogLevelFbo).
     const U = P.U;
     if (U.uRes != null) gl.uniform2f(U.uRes, cvW, cvH);
@@ -3110,7 +3086,7 @@ void main(){
     };
     const sharp = this._snowMakeFlake(96);
     // UN seul ctx.filter, sur le flocon entier (jamais un filter par trait : rendu
-    // headless pendu, vecu au banc -- cf _fxBlurCv).
+    // headless pendu -- cf _fxBlurCv).
     const soft = document.createElement('canvas'); soft.width = soft.height = 96;
     const sx = soft.getContext('2d');
     if ('filter' in sx) sx.filter = 'blur(7px)';   // Safari ancien : pas de filter -> net
@@ -3183,7 +3159,7 @@ void main(){
 
     // La card est une DECOUPE du banc (700x500) mise a sa largeur. Les points vivent
     // en espace clip : sans correction, les flocons du banc se tasseraient dans une
-    // card plus plate (mesure 02/10 sur la seule bande hero 560x118 : 72 % couverts =
+    // card plus plate (sur la seule bande hero 560x118 : 72 % couverts =
     // blizzard) et y tomberaient trop lentement en px/s.
     // K = forme du banc / forme de la card. K >= 1 (cas normal, card plate) : la scene
     // du banc est etiree en y de K et rognee -- meme nombre, meme vitesse, meme
@@ -3272,7 +3248,7 @@ void main(){
     this._snowBuf = null; this._snowTex = null; this._snowW = 0; this._snowH = 0;
   }
 
-  // OUVRE/FERME le contexte FX selon un BESOIN REEL (2026-08-19).
+  // OUVRE/FERME le contexte FX selon un BESOIN REEL.
   // _fxGlDraw savait deja qu'il n'avait rien a faire (sa garde ligne 1 teste exactement
   // ce predicat) -- mais il l'apprenait APRES l'ouverture du contexte. On remonte donc
   // le test au niveau de la creation : par beau temps, plus aucun contexte FX.
@@ -3335,8 +3311,7 @@ void main(){
   //    seule source du post-process etait `.wfxmain`, le canvas d'effets, qui est
   //    majoritairement TRANSPARENT (il ne porte que l'averse, ni le ciel ni la card).
   //    La ou il est vide, rgb=0 : une goutte y serait noire, d'ou le pansement
-  //    gris-bleu du shader -- et le constat de l'auteur du 2026-08-17, "des trucs gris
-  //    qui glissent". Une goutte sans fond ne peut pas etre une lentille.
+  //    gris-bleu du shader. Une goutte sans fond ne peut pas etre une lentille.
   //
   //    On reconstitue donc ici le VRAI arriere-plan : tout ce qui vit SOUS le calque
   //    GL (z-index 0), dans son ordre de composition -- fond de card, degrade .wsky,
@@ -3383,7 +3358,7 @@ void main(){
       g.globalCompositeOperation = 'source-over';
     }
 
-    // 5. l'averse en dernier : l'auteur veut "un peu de pluie derriere la vitre",
+    // 5. l'averse en dernier : un peu de pluie derriere la vitre,
     //    donc les traits tombent DANS la texture et les gouttes les devient.
     g.drawImage(src, 0, 0, W, H);
     return p;
@@ -3479,7 +3454,7 @@ void main(){
     // binding, tout est restaure a la fin de _fogFboDraw.
     if (A.fog) this._fogFboDraw(gl, now, cv.width, cv.height, c, fogLevelFbo);
     // passe FBO neige, meme contrat (etat restaure a la fin). Toute la card, pas
-    // seulement la zone hero : la neige ne s'arrete pas au divider (l'auteur, 02/10).
+    // seulement la zone hero : la neige ne s'arrete pas au divider.
     if (snowGl) this._snowFboDraw(gl, now, cv.width, cv.height, c);
 
     gl.useProgram(G.pr);
@@ -3575,7 +3550,7 @@ void main(){
     u1('uTime', (now - (this._fxT0 = this._fxT0 || now)) / 1000);
     u1('uCap', c.fx_plafond);
 
-    // ── ARBITRAGE DES CUMULS (banc cumul) : deux effets sur la meme vitre se
+    // ── ARBITRAGE DES CUMULS : deux effets sur la meme vitre se
     //    partagent, sinon pluie+givre donne une bouillie illisible.
     const shr = c.fx_partage_vitre;
     const dropRefr  = c.fx_pluie_refr * (A.frost ? shr : 1);
@@ -3598,8 +3573,7 @@ void main(){
 
     const wf = Math.min(Math.max(((this._windForce || 0) - 12) / 38, 0), 1);
     // wf module aussi turb/swirl/vitesse du bruit : avant seul uWindWarp suivait la
-    // force reelle du vent, turb/swirl restaient a la valeur config, fixe. Idee jury
-    // IA du 21/09 (nemotron), verifiee coherente avec le reste du fichier.
+    // force reelle du vent, turb/swirl restaient a la valeur config, fixe.
     u1('uWindWarp', c.fx_vent_warp * wf);        u1('uWindTurb', c.fx_vent_turb * (1 + wf));
     u1('uWindSwirl', c.fx_vent_swirl * (1 + wf * 2)); u1('uWindTint', c.fx_vent_teinte);
     u1('uWindTimeScale', 0.2 + wf * 0.8);
@@ -3669,10 +3643,10 @@ void main(){
    *  contextes WebGL quand on change de vue (le dashboard en ouvre deja 3 rien que pour cette
    *  card, et la lune est celle qui redessine le moins souvent -> c'est elle la victime).
    *  Une fois `webglcontextlost` tire, plus AUCUN chemin ne recreait le contexte : la lune
-   *  disparaissait jusqu'au F5. Mesure le 2026-08-17 (`_moonSnap === 'lost'` apres nav SPA). */
+   *  disparaissait jusqu'au F5 (`_moonSnap === 'lost'` apres nav SPA). */
   _moonEnsure() {
     if (!this._config || !this._config.fx_lune) return;
-    // SYMETRIE (2026-08-19) : cette methode savait CREER a la demande mais jamais
+    // SYMETRIE : cette methode savait CREER a la demande mais jamais
     // RELACHER -- en plein jour le contexte lune restait ouvert a ne rien peindre
     // (_moonDraw sort aussitot sur !_moonOn). C'est un contexte sur ~16 immobilise
     // toute la journee. En le fermant, _moonStop() retire [moongl] et le sprite SVG
@@ -3748,15 +3722,14 @@ void main(){
   //    Portage de drawSnow() du banc cumul. La neige tombe DEHORS : elle n'a rien
   //    a faire dans le shader de vitre. Peinte ici, elle traverse ensuite la passe
   //    GL -- donc une goutte la deforme, la brume la voile, la chaleur la fait
-  //    onduler. C'est exactement le cumul valide au banc.
-  //    La profondeur n'est qu'un DIVISEUR (taille/z, chute/z) : lecon n.3 du banc
-  //    neige, celle qui a debloque la chute.
+  //    onduler.
+  //    La profondeur n'est qu'un DIVISEUR (taille/z, chute/z).
   _fxSnowSeed(W, H) {
     const c = this._config;
     const key = [W | 0, H | 0, c.fx_neige_nb, c.fx_neige_prof].join(':');
     if (this._fxFlakes && this._fxFlakeKey === key) return this._fxFlakes;
     let s0 = 97; const r = () => { s0 = (s0 * 16807) % 2147483647; return s0 / 2147483647; };
-    // 2D : moins de flocons, plus gros. Approche assumee au banc (0.22 du compte 3D).
+    // 2D : moins de flocons, plus gros (0.22 du compte 3D).
     let n = Math.round(c.fx_neige_nb * 0.22);
     if (WNC_IS_LOW_POWER) n = Math.round(n * 0.5);
     const f = [];
@@ -3953,12 +3926,12 @@ void main(){
   //    ca ne survivrait pas au premier changement de layout. Une clairiere par element
   //    de contenu, DERIVEE DU CONTENU LUI-MEME.
   //
-  //    /!\ Deux pieges documentes au banc (artifact 1238bc21), tous deux vecus :
+  //    /!\ Deux pieges :
   //
   //    a) la LUMINANCE DE LA SCENE n est pas le bon signal. Elle degage la temperature
   //       et le flocon mais pas les petits libelles violets -- plus sombres que les
   //       fenetres de la ville, donc la ville degelait a leur place.
-  //    b) des BOITES pleines floutees (ce que faisait cette methode avant le 2026-09-04)
+  //    b) des BOITES pleines floutees (ancienne version de cette methode)
   //       saturent a 1.0 en leur centre : la clairiere redevient un DISQUE a bord franc,
   //       exactement le masque dessine a la main qu on voulait eviter.
   //
@@ -3978,9 +3951,7 @@ void main(){
     // On le prepare avant de calculer la cle pour que son arrivee la fasse bouger.
     // /!\ querySelectorAll, PAS querySelector : .wicon est la grosse icone de
     // l entete, mais les 7 tuiles de prevision ont chacune la leur (.wmini). Avec
-    // le singulier, le givre recouvrait les 7 icones -- visible le 2026-09-04 des
-    // que le halo a ete remis a l echelle : avant, la nappe degelait tout et le
-    // trou etait masque. l'auteur : "le givre ca doit pas cacher le texte".
+    // le singulier, le givre recouvrait les 7 icones.
     const svgs = root.querySelectorAll('.wicon svg, .wmini svg');
     // Cache par SIGNATURE : le meme soleil revient sur plusieurs jours, on ne le
     // rasterise qu une fois. Les entrees sont l Image, ou 'ko' si le SVG a echoue.
@@ -4099,18 +4070,17 @@ void main(){
   _fxInkMap() {
     const sh = this._fxInkSharp();
     if (!sh) return null;
-    // /!\ Le halo est un RAYON DE FLOU EN PIXELS, regle au banc 1238bc21 dont le
-    // canvas fait 700 px de large. Applique tel quel sur une card de 380 px il
+    // /!\ Le halo est un RAYON DE FLOU EN PIXELS, calibre sur un canvas
+    // de reference de 700 px de large. Applique tel quel sur une card de 380 px il
     // couvre une fraction 2x plus grande de l image : les 7 tuiles de prevision
-    // fusionnent en nappe et degelent 90% de la surface (mesure le 2026-09-04 :
-    // encre lum_moy 61.9, degel partiel 90.6%) -- le givre disparaissait alors
-    // que la mixmap etait pleine. On ramene donc le reglage de l'auteur dans le
-    // repere de la card : 700 = largeur du banc, donc `halo: 18` reste exact
+    // fusionnent en nappe et degelent 90% de la surface -- le givre disparaissait alors
+    // que la mixmap etait pleine. On ramene donc le reglage dans le
+    // repere de la card : 700 = largeur de reference, donc `halo: 18` reste exact
     // la-bas et devient proportionnel ici.
     // /!\ En CSS px, PAS en device : le calque d encre est rendu en pixels device,
     // donc a dpr 2 une card de 355 CSS px donne sh.width = 760 -- soit la largeur
-    // du banc, et un facteur 1 qui ne corrige rien. C est la largeur APPARENTE qui
-    // compte, puisque le halo doit couvrir la meme fraction d image qu au banc.
+    // de reference, et un facteur 1 qui ne corrige rien. C est la largeur APPARENTE qui
+    // compte, puisque le halo doit couvrir la meme fraction d image qu a 700 px.
     const cssW = this.getBoundingClientRect().width || (sh.width / (window.devicePixelRatio || 1));
     const haloK = Math.max(0.35, Math.min(1.0, cssW / 700));
     const halo = Math.max(2, this._config.fx_givre_halo * haloK * (sh.width / Math.max(1, cssW)));
@@ -4146,7 +4116,7 @@ void main(){
   //    Ce n'est pas un effet meteo. Aucun capteur Kp / aurore n'existe dans ce HA
   //    (verifie) : une aurore inconditionnelle serait le SEUL element de la card
   //    qui ment. Elle n'apparait donc que les nuits ou l'on verrait vraiment
-  //    quelque chose depuis chez l'auteur (campagne, zero pollution lumineuse) :
+  //    quelque chose depuis un lieu sans pollution lumineuse :
   //    LUNE NOIRE + ciel DEGAGE + nuit. Rare, et vrai -- c'est le propre d'un
   //    easter egg. Le verdict est calcule dans _render (cf `aurNow`).
   //
@@ -4288,8 +4258,7 @@ vec3 nappe(vec2 uv, float seed){
   float wv = uVert  * (smoothstep(0.05,0.38,hgt)*(1.0-smoothstep(0.55,1.60,hgt)));
   float wr = uRouge * smoothstep(0.45,1.80,hgt);
 
-  // ⚠️ LE BLEU NE SUIT PAS LE PROFIL DU FAISCEAU. Vecu le 2026-08-17 (l'auteur : "le
-  // bleu je peux le regler comme je veux je le vois pas") : en le ponderant par le
+  // ⚠️ LE BLEU NE SUIT PAS LE PROFIL DU FAISCEAU : en le ponderant par le
   // meme lognormal que le vert, il n existait que la ou le rideau n emet presque
   // rien -- le curseur marchait, il n eclairait pas. Or physiquement l azote ionise
   // emet dans une couche MINCE vers 100 km, pas le long des 200 km du faisceau :
@@ -4463,9 +4432,8 @@ WeatherNeonCardWebgl.styles = `
   .whero { display:flex; align-items:center; gap:10px; }
   .wicon { flex:none; }
   /* temp : glow multi-couches (calé sur dual-thermo-card), couleur = accent */
-  /* 50px -> 44px (l'auteur, 2026-08-17, vu sur telephone) : la temperature poussait la
-     colonne de droite au point de tronquer le nom de la commune
-     ("SAINT-JEAN-DE-LU…"). On lui rend ~15 px sans qu'elle cesse d'etre l'element
+  /* 50px -> 44px (vu sur telephone) : la temperature poussait la
+     colonne de droite au point de tronquer le nom de la commune. On lui rend ~15 px sans qu'elle cesse d'etre l'element
      dominant de la zone hero. */
   .wtemp { flex:none; font-size:44px; font-weight:900; letter-spacing:-2.5px; line-height:.95;
     color:#fff; mix-blend-mode:screen;
@@ -4554,7 +4522,7 @@ WeatherNeonCardWebgl.styles = `
             mask:linear-gradient(90deg, transparent 0, #000 6%, #000 94%, transparent 100%); }
   /* quand le GL tient la barre, le 2D reste dessine mais n'est plus affiche. */
   :host([fxgl]) .wfxmain { visibility:hidden; }
-  /* IDEM POUR LE GIVRE (2026-09-03). .wfrost-canvas est en z-index 2, donc
+  /* IDEM POUR LE GIVRE. .wfrost-canvas est en z-index 2, donc
      AU-DESSUS du GL (z1) : sans cette regle le dessin bleu de dendrites du 2D
      recouvre la glace du shader -- on voyait le volet 'Actuel' du banc peint
      par-dessus le 'Propose'. Le canvas reste DESSINE : _fxFrostMap() en derive
@@ -4658,7 +4626,7 @@ WeatherNeonCardWebgl.styles = `
       -1.5px 0 rgba(0,229,255,.7);
     animation:wtglitch 5s steps(1) infinite; }
 
-  /* ─── ANTI-BROUILLARDS (v3.2.1, 02/10/2026) ───
+  /* ─── ANTI-BROUILLARDS (v3.2.1) ───
      En brouillard, l'accent passe a #9fb2c9 (gris-bleu pale) sur le degrade gris du
      ciel 'fog', que les nappes billboards eclaircissent encore. Du pale sur du pale :
      les textes s'y noient. Le brouillard est valide du premier coup, on n'y touche
@@ -4781,9 +4749,9 @@ uniform float uFogAmt;
 uniform sampler2D uFog;
 uniform sampler2D uSnow;
 float h21(vec2 p){ return fract(sin(dot(p,vec2(41.3,289.1)))*43758.5453); }
-// ── Micro-relief de glace (banc 1238bc21) ────────────────────────────────────
+// ── Micro-relief de glace ────────────────────────────────────────────────────
 //    Tient lieu du _IceTex de Riccardi. VU SEULEMENT dans les branches, et STATIQUE :
-//    aucun uTime ici, le givre ne respire pas (consigne de l'auteur). Hash propre au banc.
+//    aucun uTime ici, le givre ne respire pas.
 float frH21(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
 float frVn(vec2 p){
   vec2 i=floor(p), f=fract(p); vec2 u=f*f*(3.0-2.0*f);
@@ -4889,7 +4857,7 @@ void main(){
   vec2 suv=clamp(uv+off,0.002,0.998);
   vec4 s4=texture2D(uSharp,suv);
   vec3 col=s4.rgb;
-  // Au banc la scene remplissait le canvas : gl_FragColor.a=1.0 y etait sans effet.
+  // Sur un canvas plein, gl_FragColor.a=1.0 serait sans effet.
   // Dans la card le canvas d'effets est MAJORITAIREMENT TRANSPARENT (il se superpose
   // a la card) -- garder a=1 rendrait le calque opaque et masquerait tout. On part
   // donc de l'alpha de la source, et chaque effet AJOUTE sa propre couverture.
@@ -4897,7 +4865,7 @@ void main(){
   // Lumiere ADDITIVE pure (billboards du fog) : la sortie finale fait *alpha sur col,
   // donc tout ce qui passe par col est ecrase par un alpha faible. fogAdd contourne
   // ce *alpha -- trouve par calcul sur la mesure (FBO a=27/255 -> contribution reelle
-  // ~0.007 au lieu de 0.067 attendu, cf jury IA + advisor du 21/09).
+  // ~0.007 au lieu de 0.067 attendu).
   vec3 fogAdd=vec3(0.0);
 #ifdef FX_SNOW
   // neige GL_POINTS (_snowFbo, PREMULTIPLIEE). Elle tombe DEHORS : lue a suv (la
@@ -4917,10 +4885,9 @@ void main(){
   // La goutte est de la MATIERE : elle existe meme la ou la scene est vide -- sinon
   // il ne pleut que devant les nuages et la vitre est seche partout ailleurs.
   // MAIS la ou la scene est vide, son rgb vaut 0 : lui donner de l'alpha sans lui
-  // donner de couleur peint une GOUTTE NOIRE (constate : 19% des pixels visibles a
-  // rgb=0). Le verre mouille n'est pas noir, il est clair : on donne donc a cette
+  // donner de couleur peint une GOUTTE NOIRE. Le verre mouille n'est pas noir, il est clair : on donne donc a cette
   // couverture propre sa propre teinte, ponderee par ce qu'elle ajoute au-dela de
-  // la scene. Invisible au banc, ou la scene remplissait tout le canvas.
+  // la scene. Invisible quand la scene remplit tout le canvas.
   float drop=max(wet*0.55,glint);
   // /!\ INERTE des que la card fournit la PLAQUE de fond (uSharp opaque -> s4.a=1
   // -> sup=0). Ce bloc ne reste que comme filet : si la plaque ne peut pas etre
@@ -4937,10 +4904,10 @@ void main(){
   }
 #endif
 #ifdef FX_FROST
-  // Modele d eclairage de Riccardi, repris du banc 1238bc21 ligne a ligne.
+  // Modele d eclairage de Riccardi, repris ligne a ligne.
   // /!\ La lumiere DEPEND DE LA POSITION ECRAN : c est elle qui donne le galbe rond
   // a la plaque de glace. Une direction fixe rend la surface plate -- c etait le cas
-  // avant, et c est le gros de l ecart que l'auteur voyait entre l artifact et la card.
+  // avant.
   vec3 lsrc=normalize(vec3(uv*2.0-1.0,1.0));
   vec3 iceN=iceNormal(uv);
   float NdotL=clamp(dot(iceN,lsrc),0.0,1.0);
@@ -4966,10 +4933,10 @@ void main(){
   float fk=uFogAmt*0.55*(0.35+0.65*depth);
   col=mix(col,fogc,fk);
   alpha=max(alpha,fk);                      // la brume est un voile : elle a sa densite
-  // nappes billboards (banc CCJAE5Yzr3HB47bHnKjkwQ) : rendues a part dans _fogFbo en
+  // nappes billboards : rendues a part dans _fogFbo en
   // additif ONE,ONE -- fp.rgb est deja de la lumiere PREMULTIPLIEE (FOG_FS sort hue*k,k).
   // uv non deforme (pas suv) : les billboards sont en espace ecran pur, la deformation
-  // vitre (pluie/givre) ne doit pas les etirer (point releve par le jury IA, nemotron).
+  // vitre (pluie/givre) ne doit pas les etirer.
   vec4 fp=texture2D(uFog,uv);
   // fogAdd contourne le *alpha de la sortie finale : mis dans col, fp.rgb*fp.a etait
   // ecrase deux fois (mix() par fpk PUIS *alpha en sortie) -> contribution ecran
@@ -5002,7 +4969,7 @@ WeatherNeonCardWebgl.FX_UNAMES = ["uSharp", "uBlur", "uMix", "uInk", "uRes", "uT
 //    Android) : chaque sommet porte son coin + sa graine d'instance, toute l'anim
 //    (derive, rotation, cycle de vie) se calcule dans le vertex shader via uTime.
 WeatherNeonCardWebgl.FOG_N = 150;                // fallback si fogx_count absent de la config
-                                                  // (valeur validee par l'auteur au banc, cf fogx_*)
+                                                  // (cf fogx_*)
 WeatherNeonCardWebgl.FOG_VS = `attribute vec2 aCorner;attribute vec2 aUv;attribute vec3 aRnd;
 varying vec2 vUv;varying float vLife,vBlink,vHue;
 uniform vec2 uRes;uniform float uTime,uSpin,uSize,uSpeed,uGround;
@@ -5034,8 +5001,8 @@ void main(){
   // alpha PAR TEXTURE (fBm, cf _fogMakePuffTex) au lieu d'un smoothstep radial : un
   // disque degrade a des isolignes circulaires parfaites, l'oeil y lit "un disque"
   // quel que soit le contenu -- 150 disques qui se chevauchent fusionnent en voile
-  // continu. Le fBm a des zeros DURS a l'interieur du puff (banc CCJAE5Yzr3HB47bHnKjkwQ,
-  // legende "alpha turbulent" ; verbatim du sketch ykob/sketch-threejs, fog.fs, qui
+  // continu. Le fBm a des zeros DURS a l'interieur du puff ("alpha
+  // turbulent" ; verbatim du sketch ykob/sketch-threejs, fog.fs, qui
   // echantillonne une texture externe au lieu d'un gradient radial).
   float puff=texture2D(uTex,vUv).a;
   float blink=(1.0-uBlink)+uBlink*sin(uTime*3.0*max(0.1,vBlink)+vHue*6.2831);
@@ -5174,7 +5141,7 @@ customElements.define('weather-neon-card-webgl', WeatherNeonCardWebgl);
 //  ici (genere), PAS derive de WeatherNeonCardEditor (source canvas 2D) :
 //  ~75 des champs (sky_*/fx_*) n'existent QUE dans cette variante, les
 //  ajouter a la source canvas 2D y creerait des champs morts.
-//  Pas de bloc "header" (demande explicite de l'auteur, 25/08/2026).
+//  Pas de bloc "header".
 // ═══════════════════════════════════════════════════════
 class WeatherNeonCardWebglEditor extends HTMLElement {
   constructor() { super(); this._config = {}; this._hass = null; this._rendered = false; }
@@ -5475,7 +5442,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._number('fx_vent_teinte', 'Vent — teinte', { min: 0, max: 1, step: 0.02, ph: '0.55' });
       this._toggle('fx_brouillard_toujours', 'Brouillard toujours visible (démo)', false);
       this._number('fx_antibrouillard', 'Anti-brouillards — lisibilité des textes en brouillard ou neige (0 = éteints)', { min: 0, max: 1, step: 0.05, ph: '0.70' });
-      this._hint('Brouillard billboards (nappes WebGL) — réglages du banc du 21/09.');
+      this._hint('Brouillard billboards (nappes WebGL).');
       this._number('fogx_level', 'Brouillard billboards — niveau', { min: 0, max: 1, step: 0.05, ph: '0.80' });
       this._number('fogx_count', 'Brouillard billboards — nombre', { min: 0, max: 400, step: 10, ph: '150' });
       this._number('fogx_size', 'Brouillard billboards — taille', { min: 0, max: 3, step: 0.05, ph: '1.30' });
