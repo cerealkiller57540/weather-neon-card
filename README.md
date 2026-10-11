@@ -26,6 +26,11 @@ The card reads your `weather.*` entity and turns the condition into a scene. Rai
 
 Both follow the real moon phase. To see them without waiting, set `fx_et_toujours: true` or `fx_aurore_toujours: true` (demo modes, not meant to stay on).
 
+Two more are demo-only for now, with no automatic trigger yet. Switch them on by hand:
+
+- `fx_lune_rouge_toujours: true`: a blood-red moon with a skull imprinted on the lunar seas.
+- `fx_lune_etoile_toujours: true`: the moon is replaced by a battle station that is definitely not a moon (wins over the red moon if both are on).
+
 ## ✨ Features
 
 - **A live WebGL sky and glass effects**, with a canvas fallback when WebGL is not available.
@@ -111,6 +116,7 @@ pollen_entity: sensor.atmo_france_qualite_globale_pollen_<zone>
 | `fx_lune` / `fx_lune_taille` | `true` / `96` | Photographic moon with its real phase, size in px |
 | `fx_aurore` / `fx_aurore_toujours` | `true` / `false` | Aurora easter egg / demo mode |
 | `fx_et` / `fx_et_toujours` | `true` / `false` | Full-moon easter egg / demo mode |
+| `fx_lune_rouge_toujours` / `fx_lune_etoile_toujours` | `false` / `false` | Blood-red moon with skull / battle-station moon (demo switches; tune them in the editor's moon easter egg group) |
 | `largeur_ref` | `380` | Width the card is drawn at; narrower columns scale the whole block |
 | `show_clock` | `false` | Time banner at the top of the card (the card grows by about 18 px) |
 | `clock_align` / `clock_size` | `center` / `18` | `center` or `left`; time size in px |

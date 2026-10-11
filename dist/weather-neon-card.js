@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.7.0
+ * weather-neon-card v3.8.0
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.7.0';
+const VERSION = '3.8.0';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -340,6 +340,23 @@ function buildConfig(raw) {
     fx_lune_halok:   _n(raw.fx_lune_halok,   0.40),
     fx_lune_incl:    _n(raw.fx_lune_incl,    -18),
     fx_lune_grain:   _n(raw.fx_lune_grain,   0.25),
+    // EASTER EGGS de la lune : lune rouge + crane, Etoile de la Mort. Valeurs reglees au
+    // banc. Pas de declenchement reel pour l'instant : `*_toujours` = demo, jamais en prod.
+    // L'Etoile de la Mort l'emporte si les deux sont actives.
+    fx_lune_rouge_toujours:  raw.fx_lune_rouge_toujours  ?? false,
+    fx_lune_etoile_toujours: raw.fx_lune_etoile_toujours ?? false,
+    fx_lune_rouge:        _n(raw.fx_lune_rouge,        0.90),   // teinte sang
+    fx_lune_eclipse:      _n(raw.fx_lune_eclipse,      0.60),   // face sombre visible, cuivre
+    fx_lune_clarte:       _n(raw.fx_lune_clarte,       0.85),
+    fx_lune_opacite:      _n(raw.fx_lune_opacite,      0.90),   // plancher d'opacite du disque
+    fx_lune_crane:        _n(raw.fx_lune_crane,        0.75),
+    fx_lune_crane_taille: _n(raw.fx_lune_crane_taille, 0.72),   // x diametre
+    fx_lune_crane_y:      _n(raw.fx_lune_crane_y,      0.02),
+    fx_lune_crane_inv:    _n(raw.fx_lune_crane_inv,    0.14),   // 0 sombre, 1 lumineux
+    fx_lune_etoile_phase: _n(raw.fx_lune_etoile_phase, 0.00),   // 0 = image telle quelle
+    fx_lune_etoile_eclat: _n(raw.fx_lune_etoile_eclat, 1.00),
+    fx_lune_etoile_halo:  _n(raw.fx_lune_etoile_halo,  25),
+    fx_lune_etoile_halok: _n(raw.fx_lune_etoile_halok, 0.80),
     // neige GL_POINTS (v3.3.0, cles snowx_*). Elle tombe DEHORS, derriere la vitre :
     // rendue dans son FBO puis posee SOUS les effets de vitre (#define FX_SNOW), donc
     // deformee par les gouttes et voilee par la brume. La neige 2D (_drawSnow) ne
@@ -1152,6 +1169,22 @@ const _EN = {
  "Plafond cumul vitre": "Glass stacking cap",
  "Pleine lune + ciel dégagé + nuit : un passage à l'affichage, puis à chaque tap sur la lune. fx_et_toujours = mode démo, jamais en prod.": "Full moon + clear sky + night: one flyby on display, then on every tap on the moon. fx_et_toujours = demo mode, never in production.",
  "Plis": "Folds",
+ "Lune — easter eggs (lune rouge, Étoile de la Mort)": "Moon — easter eggs (blood moon, Death Star)",
+ "Déclenchement réel à définir : seuls les interrupteurs de démo existent pour l'instant, jamais en prod. L'Étoile de la Mort l'emporte si les deux sont actifs.": "Real trigger still to be defined: only the demo switches exist for now, never in production. The Death Star wins if both are on.",
+ "Lune rouge + crâne — toujours (démo)": "Blood moon + skull — always (demo)",
+ "Étoile de la Mort — toujours (démo)": "Death Star — always (demo)",
+ "Lune rouge — teinte sang": "Blood moon — blood tint",
+ "Lune rouge — éclipse (face sombre visible)": "Blood moon — eclipse (dark side visible)",
+ "Lune rouge — clarté": "Blood moon — brightness",
+ "Lune rouge — opacité du disque": "Blood moon — disc opacity",
+ "Crâne — force": "Skull — strength",
+ "Crâne — taille (x diamètre)": "Skull — size (x diameter)",
+ "Crâne — décalage vertical": "Skull — vertical offset",
+ "Crâne — 0 sombre / 1 lumineux": "Skull — 0 dark / 1 bright",
+ "Étoile de la Mort — suit la phase": "Death Star — follows the phase",
+ "Étoile de la Mort — éclat": "Death Star — brightness",
+ "Étoile de la Mort — halo (px)": "Death Star — halo (px)",
+ "Étoile de la Mort — intensité du halo": "Death Star — halo intensity",
  "Pluie": "Rain",
  "Pluie et neige": "Rain and snow",
  "Pluie nocturne": "Night rain",
@@ -1384,9 +1417,9 @@ class WeatherNeonCardWebgl extends HTMLElement {
         <canvas class="wfxgl"></canvas>
         <canvas class="wfrost-canvas"></canvas>
         <div class="wflash"></div>
+        <div class="wfxlayer"></div>
         <canvas class="wmoongl"></canvas>
         <svg class="wet" viewBox="0 0 100 60" aria-hidden="true" fill="#000" stroke="#000"><g class="wetcape"><path d="M45 12.5 C36 10.5 24 11.5 11 19.5 C15 20.5 17 22 15 25.5 C23 22.5 30 25.5 36 29.5 L44 22 Z"/></g><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="22" cy="47" r="10.3" stroke-width="2.4"/><circle cx="70" cy="47" r="10.3" stroke-width="2.4"/><path stroke-width="1.9" d="M22 47 L40 47 L35 31 Z M40 47 L62 30 M35.5 32.5 L62 30.5 M62 30 L70 47 M62 30 L60.5 22 M57 21.5 L64.5 20.5"/><path stroke-width="1.6" d="M40 47 L42.5 51.5 M22 47 L22 47.1 M70 47 L70 47.1"/><path stroke-width="2.8" d="M47 17 L59.5 21.5"/><path stroke-width="3.1" d="M37 29.5 L47.5 35.5 L42.8 51"/></g><path d="M34 31 C35 24 40 17 45.5 12.5 L50.5 15.5 C47.5 21 44.5 26 42.5 31.5 Z"/><circle cx="49" cy="8.6" r="4.6"/><rect x="58" y="17.5" width="14.5" height="9" rx="1.2"/><path d="M59.4 18.5 C58.8 10.5 61 3.2 65.8 2.2 C70.6 3.2 73 10.5 72.4 18.5 Z"/></svg>
-        <div class="wfxlayer"></div>
         <div class="wbeam"></div>
         ${this._config.neon_fx ? '<div class="wscan"></div>' : ''}
         <div class="winner"></div>
@@ -2336,7 +2369,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // que ce truc existe.
     const nightNow = this._isNight || NIGHT_CONDS.has(cond);
     if (fxOn && nightNow) this._startNight(); else this._stopNight();
-    this._moonOn = !!(this._config.fx_lune && (nightNow || this._config.fx_lune_toujours));
+    this._moonMode = this._config.fx_lune_etoile_toujours ? 2 : (this._config.fx_lune_rouge_toujours ? 1 : 0);
+    this._moonOn = !!(this._config.fx_lune && (nightNow || this._config.fx_lune_toujours || this._moonMode));
     this._moonEnsure();
     // AURORE (easter egg) : lune NOIRE + ciel DEGAGE + nuit. Les trois, sans quoi
     // l'effet mentirait (aucun capteur Kp ici). `cond` est deja passe en variante
@@ -2754,7 +2788,7 @@ void main(){
     this._skyStop(false);
     this._fxGlStop(false);
     this._moonGl = null; this._moonP = null; this._moonU = null;
-    this._moonTex = null; this._moonSnap = '';
+    this._moonTex = null; this._moonSnap = ''; this._moonAuxT = null;
     this._aurStop(false);
   }
   // Restauration : exactement le chemin du rattachement, qui sait deja tout rallumer.
@@ -3671,7 +3705,7 @@ void main(){
     if (!P) return;
     WNC_GL.hold(this);
     this._moonGl = gl; this._moonP = P; this._moonU = P.U;
-    this._moonTex = null; this._moonSnap = '';
+    this._moonTex = null; this._moonSnap = ''; this._moonAuxT = null;
     // a partir d'ici seulement, le sprite SVG est redondant : on l'efface.
     this.setAttribute('moongl', '');
     // perte de contexte : geree par WNC_GL (_glLost). La lune deja peinte reste dans
@@ -3718,9 +3752,39 @@ void main(){
     this._moonDraw();
   }
 
+  // Textures des easter eggs (masque de crane, Etoile de la Mort), decodees a la demande :
+  // en usage normal elles ne coutent ni memoire GPU ni decodage. Renvoie vrai si prete.
+  _moonAux(key, unit, fmt) {
+    const gl = this._moonGl;
+    const m = this._moonAuxT || (this._moonAuxT = {});
+    if (m[key]) return !!m[key].t;
+    const st = m[key] = { t: null };
+    const img = new Image();
+    img.onload = () => {
+      if (this._moonGl !== gl || gl.isContextLost()) return;
+      const t = gl.createTexture();
+      gl.activeTexture(gl.TEXTURE0 + unit);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+      gl.texImage2D(gl.TEXTURE_2D, 0, fmt, fmt, gl.UNSIGNED_BYTE, img);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      st.t = t; this._moonSnap = ''; this._moonDraw();
+    };
+    img.src = key === 'skull' ? WeatherNeonCardWebgl.MOON_SKULL : WeatherNeonCardWebgl.MOON_DS;
+    return false;
+  }
+
   _moonStop() {
     const gl = this._moonGl;
     if (gl && this._moonTex && !gl.isContextLost()) gl.deleteTexture(this._moonTex);
+    if (gl && this._moonAuxT && !gl.isContextLost()) {
+      for (const k in this._moonAuxT) if (this._moonAuxT[k].t) gl.deleteTexture(this._moonAuxT[k].t);
+    }
+    this._moonAuxT = null;
     this._glWipe(this._elMoonGl);
     this._moonGl = null; this._moonP = null;
     this._moonTex = null; this._moonU = null; this._moonSnap = '';
@@ -3746,7 +3810,15 @@ void main(){
     const my = (8 + size / 2) * cv._dpr;
     // Rien ne bouge d'une frame a l'autre : la phase avance de 1/29,5 par JOUR. On
     // ne redessine que si l'etat a change (taille du canvas, phase au millieme).
-    const snap = [cv.width, cv.height, ph.toFixed(4), size].join(':');
+    const mode = this._moonMode || 0;
+    // une texture absente se lit noire : on attend son decodage (onload redessine)
+    if (mode === 1 && !this._moonAux('skull', 1, gl.LUMINANCE)) return;
+    if (mode === 2 && !this._moonAux('ds', 2, gl.RGBA)) return;
+    const fx = mode ? [c.fx_lune_rouge, c.fx_lune_eclipse, c.fx_lune_clarte, c.fx_lune_opacite,
+      c.fx_lune_crane, c.fx_lune_crane_taille, c.fx_lune_crane_y, c.fx_lune_crane_inv,
+      c.fx_lune_etoile_phase, c.fx_lune_etoile_eclat, c.fx_lune_etoile_halo,
+      c.fx_lune_etoile_halok].join(',') : '';
+    const snap = [cv.width, cv.height, ph.toFixed(4), size, mode, fx].join(':');
     if (snap === this._moonSnap) return;
     this._moonSnap = snap;
     const u1 = (n, v) => { if (U[n] != null) gl.uniform1f(U[n], v); };
@@ -3769,6 +3841,21 @@ void main(){
     u1('uHaloK', c.fx_lune_halok);    u1('uIncl', c.fx_lune_incl);
     u1('uGrain', c.fx_lune_grain);
     u1('uTexel', 1 / WeatherNeonCardWebgl.MOON_TEXSZ);
+    u1('uMode', mode);
+    if (mode) {
+      u1('uRed', c.fx_lune_rouge);          u1('uFull', c.fx_lune_eclipse);
+      u1('uDim', c.fx_lune_clarte);         u1('uOpa', c.fx_lune_opacite);
+      u1('uSkK', c.fx_lune_crane);          u1('uSkS', c.fx_lune_crane_taille);
+      u1('uSkY', c.fx_lune_crane_y);        u1('uSkInv', c.fx_lune_crane_inv);
+      u1('uDsPh', c.fx_lune_etoile_phase);  u1('uDsGain', c.fx_lune_etoile_eclat);
+      u1('uDsHalo', c.fx_lune_etoile_halo * cv._dpr);
+      u1('uDsHaloK', c.fx_lune_etoile_halok);
+      const t = this._moonAuxT[mode === 1 ? 'skull' : 'ds'].t;
+      gl.activeTexture(gl.TEXTURE0 + mode);
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      const ul = mode === 1 ? U.uSk : U.uDs;
+      if (ul != null) gl.uniform1i(ul, mode);
+    }
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     WNC_GL.blit(cv);
   }
@@ -5137,17 +5224,47 @@ void main(){
 WeatherNeonCardWebgl.SNOW_UNAMES = ["uTime", "uWind", "uGravity", "uSize", "uSway", "uDepth", "uFade", "uTint", "uBokeh", "uMaxPt", "uPx", "uFallK", "uYK", "uTex", "uSoft"];
 WeatherNeonCardWebgl.MOON_VS = `attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}`;
 WeatherNeonCardWebgl.MOON_FS = `precision highp float;
-uniform vec2 uRes,uC; uniform float uR;
+uniform vec2 uRes,uC; uniform float uR,uMode;
 uniform float uPhase,uSoft,uRelief,uLimb,uEarth,uNight,uTint,uGain,uHalo,uHaloK,uIncl,uGrain,uTexel;
-uniform sampler2D uTex;
+uniform float uRed,uFull,uDim,uSkK,uSkS,uSkY,uSkInv,uOpa;
+uniform float uDsPh,uDsGain,uDsHalo,uDsHaloK;
+uniform sampler2D uTex,uSk,uDs;
 float h21(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float dsA(vec2 uv){ if(uv.x<0.||uv.x>1.||uv.y<0.||uv.y>1.) return 0.; return texture2D(uDs,uv).a; }
 void main(){
   vec2 px=gl_FragCoord.xy;
   vec2 d=(px-uC)/uR;
   float r=length(d);
+  float a=uPhase*6.2831853, ti=radians(uIncl);
+  vec3 L=vec3(sin(a),0.0,-cos(a));
+  L=normalize(vec3(L.x*cos(ti),L.x*sin(ti),L.z));
+  if(uMode>1.5){
+    // Etoile de la Mort : l'image porte sa propre silhouette (encoche comprise), donc un
+    // halo radial mentirait. Halo = alpha flouee, 24 prises autour du pixel.
+    float halo=uDsHalo/uR;
+    if(r>1.0+halo+0.05){ gl_FragColor=vec4(0.0); return; }
+    vec2 uv=d*0.5+0.5;
+    vec4 t=vec4(0.0);
+    if(uv.x>=0.&&uv.x<=1.&&uv.y>=0.&&uv.y<=1.) t=texture2D(uDs,uv);
+    float g=0.0;
+    for(int i=0;i<12;i++){
+      float an=float(i)*0.5235988; vec2 o=vec2(cos(an),sin(an))*0.5;
+      g+=dsA(uv+o*halo*0.35)+dsA(uv+o*halo*0.85);
+    }
+    g=g/24.0;
+    g=pow(g,1.4)*uDsHaloK*(1.0-t.a);
+    vec3 gc=vec3(0.55,0.75,1.0)*g;
+    vec3 N=vec3(d,sqrt(max(1.0-r*r,1e-4)));
+    float lit=smoothstep(-0.06,0.06,dot(N,L));
+    float sh=mix(1.0,mix(0.16,1.0,lit),uDsPh);
+    vec3 c=t.rgb*uDsGain*sh;
+    gl_FragColor=vec4(c*t.a+gc,t.a+g);
+    return;
+  }
   float halo=uHalo/uR;
   if(r>1.0+halo){ gl_FragColor=vec4(0.0); return; }
   vec3 tint=mix(vec3(0.80,0.87,1.00),vec3(1.00,0.95,0.85),uTint);
+  if(uMode>0.5) tint=mix(tint,vec3(1.0,0.24,0.09),uRed);
   // halo : retombee quadratique, additive, HORS du disque uniquement.
   // Sans le facteur "rim", pow(...) vaut 1 partout dans le disque et deverse un gris
   // uniforme sous la part sombre : le croissant cesse de se lire.
@@ -5169,9 +5286,6 @@ void main(){
     float ax=texture2D(uTex,uv+vec2(uTexel,0.0)).r-texture2D(uTex,uv-vec2(uTexel,0.0)).r;
     float ay=texture2D(uTex,uv+vec2(0.0,uTexel)).r-texture2D(uTex,uv-vec2(0.0,uTexel)).r;
     N=normalize(N+uRelief*vec3(-ax,-ay,0.0)*3.0);
-    float a=uPhase*6.2831853, ti=radians(uIncl);
-    vec3 L=vec3(sin(a),0.0,-cos(a));
-    L=normalize(vec3(L.x*cos(ti),L.x*sin(ti),L.z));
     float mu0=dot(N,L);
     float mu=max(dot(N,vec3(0.0,0.0,1.0)),1e-3);
     float lit=smoothstep(-uSoft,uSoft,mu0);
@@ -5182,11 +5296,27 @@ void main(){
     // Lumiere cendree : le clair de Terre, maximal au voisinage de la nouvelle lune.
     float ew=smoothstep(0.0,0.8,cos(a));
     float earth=uEarth*ew*(1.0-lit);
-    vec3 c=alb*(shade*uGain*tint+earth*vec3(0.42,0.60,1.00));
+    float gain=uGain;
+    // lune rouge : la face sombre se remplit (eclipse) et l'ensemble s'assombrit
+    if(uMode>0.5){ shade=max(shade,uFull*0.6*alb*1.6); gain*=uDim; }
+    vec3 c=alb*(shade*gain*tint+earth*vec3(0.42,0.60,1.00));
+    if(uMode>0.5){
+      float lm=dot(c,vec3(0.299,0.587,0.114));
+      vec3 rc=vec3(1.0,0.27,0.11)*lm*1.5;
+      rc=mix(rc,vec3(1.0,0.5,0.28)*lm,smoothstep(0.7,1.3,lm));
+      c=mix(c,rc,uRed);
+      // crane : masque 128 px, sombre comme une mer lunaire (uSkInv -> 1 = lumineux)
+      vec2 su=(d-vec2(0.0,uSkY))/max(uSkS,0.05)*0.5+0.5;
+      float m=0.0;
+      if(su.x>=0.&&su.x<=1.&&su.y>=0.&&su.y<=1.) m=texture2D(uSk,su).r;
+      c=c*(1.0-uSkK*m*(1.0-uSkInv))+vec3(1.0,0.34,0.14)*uSkK*m*uSkInv*(0.5+lm);
+    }
     c+=(h21(px+uPhase)-0.5)*uGrain*0.055;
     c=max(c,vec3(0.0));
     float lum=dot(c,vec3(0.299,0.587,0.114));
-    da=edge*clamp(uNight+(1.0-uNight)*lum*5.0,0.0,1.0);
+    float vis=clamp(uNight+(1.0-uNight)*lum*5.0,0.0,1.0);
+    if(uMode>0.5) vis=max(vis,uOpa);
+    da=edge*vis;
     dc=c;
   }
   // composition disque SUR halo, en premultiplie (le canvas est transparent, le ciel dessous)
@@ -5194,8 +5324,13 @@ void main(){
   float oa=da+ha*(1.0-da);
   gl_FragColor=vec4(o,oa);
 }`;
-WeatherNeonCardWebgl.MOON_UN = ["uRes", "uC", "uR", "uPhase", "uSoft", "uRelief", "uLimb", "uEarth", "uNight", "uTint", "uGain", "uHalo", "uHaloK", "uIncl", "uGrain", "uTexel", "uTex"];
+WeatherNeonCardWebgl.MOON_UN = ["uRes", "uC", "uR", "uPhase", "uSoft", "uRelief", "uLimb", "uEarth", "uNight", "uTint", "uGain", "uHalo", "uHaloK", "uIncl", "uGrain", "uTexel", "uTex",
+  "uMode", "uRed", "uFull", "uDim", "uSkK", "uSkS", "uSkY", "uSkInv", "uOpa", "uDsPh", "uDsGain", "uDsHalo", "uDsHaloK", "uSk", "uDs"];
 WeatherNeonCardWebgl.MOON_TEXSZ = 128;
+/* Easter eggs de la lune, en data: URI comme MOON_TEX : masque de crane (PNG gris 128 px,
+   issu d'un SVG) et Etoile de la Mort (WebP RGBA 192 px). Charges a la demande. */
+WeatherNeonCardWebgl.MOON_SKULL = "data:image/png;base64,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";
+WeatherNeonCardWebgl.MOON_DS = "data:image/webp;base64,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";
 /* Albedo lunaire aplati (moon_prep.py), JPEG q82 en niveaux de gris, embarque en
    data: URI : la card est UN fichier depose dans www/, elle ne peut pas dependre
    d'un asset a cote (chemin inconnu, et le cache HACS ne le versionnerait pas). */
@@ -5585,6 +5720,24 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._number('fx_chaleur_teint', 'Teinte', { min: 0, max: 1, step: 0.02, ph: '0.45' });
       this._number('fx_chaleur_sat', 'Saturation', { min: 0, max: 1, step: 0.02, ph: '0.30' });
       this._number('fx_chaleur_grain', 'Grain', { min: 0, max: 1, step: 0.02, ph: '0.25' });
+    });
+
+    this._group('Lune — easter eggs (lune rouge, Étoile de la Mort)', false, () => {
+      this._hint("Déclenchement réel à définir : seuls les interrupteurs de démo existent pour l'instant, jamais en prod. L'Étoile de la Mort l'emporte si les deux sont actifs.");
+      this._toggle('fx_lune_rouge_toujours', 'Lune rouge + crâne — toujours (démo)', false);
+      this._toggle('fx_lune_etoile_toujours', 'Étoile de la Mort — toujours (démo)', false);
+      this._number('fx_lune_rouge', 'Lune rouge — teinte sang', { min: 0, max: 1, step: 0.01, ph: '0.90' });
+      this._number('fx_lune_eclipse', 'Lune rouge — éclipse (face sombre visible)', { min: 0, max: 1, step: 0.01, ph: '0.60' });
+      this._number('fx_lune_clarte', 'Lune rouge — clarté', { min: 0.3, max: 1.5, step: 0.01, ph: '0.85' });
+      this._number('fx_lune_opacite', 'Lune rouge — opacité du disque', { min: 0.3, max: 1, step: 0.01, ph: '0.90' });
+      this._number('fx_lune_crane', 'Crâne — force', { min: 0, max: 1, step: 0.01, ph: '0.75' });
+      this._number('fx_lune_crane_taille', 'Crâne — taille (x diamètre)', { min: 0.3, max: 1.2, step: 0.01, ph: '0.72' });
+      this._number('fx_lune_crane_y', 'Crâne — décalage vertical', { min: -0.3, max: 0.3, step: 0.01, ph: '0.02' });
+      this._number('fx_lune_crane_inv', 'Crâne — 0 sombre / 1 lumineux', { min: 0, max: 1, step: 0.01, ph: '0.14' });
+      this._number('fx_lune_etoile_phase', 'Étoile de la Mort — suit la phase', { min: 0, max: 1, step: 0.01, ph: '0.00' });
+      this._number('fx_lune_etoile_eclat', 'Étoile de la Mort — éclat', { min: 0.5, max: 1.6, step: 0.01, ph: '1.00' });
+      this._number('fx_lune_etoile_halo', 'Étoile de la Mort — halo (px)', { min: 0, max: 60, step: 1, ph: '25' });
+      this._number('fx_lune_etoile_halok', 'Étoile de la Mort — intensité du halo', { min: 0, max: 1, step: 0.01, ph: '0.80' });
     });
 
     this._group('Aurore boréale (easter egg)', false, () => {
