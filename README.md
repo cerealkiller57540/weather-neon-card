@@ -31,6 +31,8 @@ Two more are demo-only for now, with no automatic trigger yet. Switch them on by
 - `fx_lune_rouge_toujours: true`: a blood-red moon with a skull imprinted on the lunar seas.
 - `fx_lune_etoile_toujours: true`: the moon is replaced by a battle station that is definitely not a moon (wins over the red moon if both are on).
 
+<img src="https://raw.githubusercontent.com/cerealkiller57540/weather-neon-card/main/images/death-star.jpg" alt="The moon replaced by the Death Star above a clear night sky" width="520">
+
 ## ✨ Features
 
 - **A live WebGL sky and glass effects**, with a canvas fallback when WebGL is not available.
