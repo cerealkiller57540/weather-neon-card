@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.8.0
+ * weather-neon-card v3.9.0
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.8.0';
+const VERSION = '3.9.0';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -341,8 +341,9 @@ function buildConfig(raw) {
     fx_lune_incl:    _n(raw.fx_lune_incl,    -18),
     fx_lune_grain:   _n(raw.fx_lune_grain,   0.25),
     // EASTER EGGS de la lune : lune rouge + crane, Etoile de la Mort. Valeurs reglees au
-    // banc. Pas de declenchement reel pour l'instant : `*_toujours` = demo, jamais en prod.
-    // L'Etoile de la Mort l'emporte si les deux sont actives.
+    // banc. Declenchement reel = dates fixes (`fx_lune_dates`, cf _render) ; `*_toujours` =
+    // demo, jamais en prod. L'Etoile de la Mort l'emporte si les deux sont actives.
+    fx_lune_dates:           raw.fx_lune_dates           ?? true,
     fx_lune_rouge_toujours:  raw.fx_lune_rouge_toujours  ?? false,
     fx_lune_etoile_toujours: raw.fx_lune_etoile_toujours ?? false,
     fx_lune_rouge:        _n(raw.fx_lune_rouge,        0.90),   // teinte sang
@@ -429,6 +430,22 @@ function buildConfig(raw) {
     fx_et_arc:      _n(raw.fx_et_arc,      0.12),   // bombe de la trajectoire (x R)
     fx_et_cabre:    _n(raw.fx_et_cabre,    -6),     // inclinaison ajoutee (deg)
     fx_et_ondule:   _n(raw.fx_et_ondule,   0.50),   // battement de la cape
+    // EASTER EGG PERE NOEL : traineau + rennes devant la lune, toutes les nuits de
+    // decembre. Remplace E.T. ce mois-la. Valeurs reglees au banc noel_bench.html
+    // (12/10/2026) : ne pas les rechoisir au juge. `fx_noel_toujours` = demo.
+    fx_noel:          raw.fx_noel ?? true,
+    fx_noel_toujours: raw.fx_noel_toujours ?? false,
+    fx_noel_echelle:  _n(raw.fx_noel_echelle,  0.40),   // largeur du cortege / diametre lune
+    fx_noel_rennes:   _n(raw.fx_noel_rennes,   4),      // attelage, Rudolph en tete
+    fx_noel_duree:    _n(raw.fx_noel_duree,    6.0),    // secondes pour un passage
+    fx_noel_etendue:  _n(raw.fx_noel_etendue,  2.20),   // entre/sort a +/- etendue x R du centre
+    fx_noel_passage:  _n(raw.fx_noel_passage,  0.00),   // hauteur au milieu (x R, + = plus bas)
+    fx_noel_montee:   _n(raw.fx_noel_montee,   0.35),   // montee gauche -> droite (x R)
+    fx_noel_arc:      _n(raw.fx_noel_arc,      0.32),   // bombe de la trajectoire (x R)
+    fx_noel_cabre:    _n(raw.fx_noel_cabre,    0),      // inclinaison ajoutee (deg)
+    fx_noel_galop:    _n(raw.fx_noel_galop,    0.80),   // amplitude des pattes
+    fx_noel_houle:    _n(raw.fx_noel_houle,    1.00),   // tangage de chaque renne
+    fx_noel_nez:      _n(raw.fx_noel_nez,      1.00),   // nez rouge de Rudolph, 0 = ombre pure
     // 0.563 : rideau remonte de 3 px sur une couche de ~234 px (3/234 ~ 0.013).
     fx_aurore_base:      _n(raw.fx_aurore_base,      0.563),
     fx_aurore_amplitude: _n(raw.fx_aurore_amplitude, 0.24),
@@ -1078,6 +1095,13 @@ const _EN = {
  "Décalage": "Offset",
  "Dérive": "Drift",
  "E.T. pleine lune (easter egg)": "E.T. full moon (easter egg)",
+ "Père Noël en décembre (easter egg)": "Santa in December (easter egg)",
+ "Toutes les nuits de décembre, le traîneau passe devant la lune (à la place d'E.T.) : un passage à l'affichage, puis à chaque tap sur la lune. fx_noel_toujours = mode démo, jamais en prod.": "Every December night, the sleigh flies across the moon (instead of E.T.): one flyby when the card shows, then on every tap on the moon. fx_noel_toujours = demo mode, never in production.",
+ "Largeur du cortège (x diamètre)": "Sleigh team width (x diameter)",
+ "Nombre de rennes": "Number of reindeer",
+ "Galop des rennes": "Reindeer gallop",
+ "Tangage de l'attelage": "Team bobbing",
+ "Nez de Rudolph (0 = ombre pure)": "Rudolph's nose (0 = pure silhouette)",
  "Effets atmosphériques": "Atmospheric effects",
  "Effets généraux": "General effects",
  "Effets néon (scanlines)": "Neon effects (scanlines)",
@@ -1170,7 +1194,8 @@ const _EN = {
  "Pleine lune + ciel dégagé + nuit : un passage à l'affichage, puis à chaque tap sur la lune. fx_et_toujours = mode démo, jamais en prod.": "Full moon + clear sky + night: one flyby on display, then on every tap on the moon. fx_et_toujours = demo mode, never in production.",
  "Plis": "Folds",
  "Lune — easter eggs (lune rouge, Étoile de la Mort)": "Moon — easter eggs (blood moon, Death Star)",
- "Déclenchement réel à définir : seuls les interrupteurs de démo existent pour l'instant, jamais en prod. L'Étoile de la Mort l'emporte si les deux sont actifs.": "Real trigger still to be defined: only the demo switches exist for now, never in production. The Death Star wins if both are on.",
+ "Dates fixes, la nuit : 31/10 et vendredi 13 → lune rouge, 4 mai → Étoile de la Mort. La lune suit sa phase réelle. Les interrupteurs « toujours » = démo, jamais en prod ; l'Étoile l'emporte si les deux sont actifs.": "Fixed dates, at night: Oct 31 and Friday the 13th → blood moon, May 4 → Death Star. The moon keeps its real phase. The « always » switches = demo, never in production; the Death Star wins if both are on.",
+ "Dates fixes (31/10, vendredi 13, 4 mai)": "Fixed dates (Oct 31, Friday 13th, May 4)",
  "Lune rouge + crâne — toujours (démo)": "Blood moon + skull — always (demo)",
  "Étoile de la Mort — toujours (démo)": "Death Star — always (demo)",
  "Lune rouge — teinte sang": "Blood moon — blood tint",
@@ -1420,6 +1445,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
         <div class="wfxlayer"></div>
         <canvas class="wmoongl"></canvas>
         <svg class="wet" viewBox="0 0 100 60" aria-hidden="true" fill="#000" stroke="#000"><g class="wetcape"><path d="M45 12.5 C36 10.5 24 11.5 11 19.5 C15 20.5 17 22 15 25.5 C23 22.5 30 25.5 36 29.5 L44 22 Z"/></g><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="22" cy="47" r="10.3" stroke-width="2.4"/><circle cx="70" cy="47" r="10.3" stroke-width="2.4"/><path stroke-width="1.9" d="M22 47 L40 47 L35 31 Z M40 47 L62 30 M35.5 32.5 L62 30.5 M62 30 L70 47 M62 30 L60.5 22 M57 21.5 L64.5 20.5"/><path stroke-width="1.6" d="M40 47 L42.5 51.5 M22 47 L22 47.1 M70 47 L70 47.1"/><path stroke-width="2.8" d="M47 17 L59.5 21.5"/><path stroke-width="3.1" d="M37 29.5 L47.5 35.5 L42.8 51"/></g><path d="M34 31 C35 24 40 17 45.5 12.5 L50.5 15.5 C47.5 21 44.5 26 42.5 31.5 Z"/><circle cx="49" cy="8.6" r="4.6"/><rect x="58" y="17.5" width="14.5" height="9" rx="1.2"/><path d="M59.4 18.5 C58.8 10.5 61 3.2 65.8 2.2 C70.6 3.2 73 10.5 72.4 18.5 Z"/></svg>
+        <svg class="wnoel" aria-hidden="true" fill="#000" stroke="#000"></svg>
         <div class="wbeam"></div>
         ${this._config.neon_fx ? '<div class="wscan"></div>' : ''}
         <div class="winner"></div>
@@ -1435,6 +1461,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._elFx = this.shadowRoot.querySelector('.wfxlayer');
     this._elMoonGl = this.shadowRoot.querySelector('.wmoongl');
     this._elEt = this.shadowRoot.querySelector('.wet');
+    this._elNoel = this.shadowRoot.querySelector('.wnoel');
     // PAS de _moonInit() ici : en plein jour ce contexte restait ouvert
     // a ne rien peindre (_moonDraw sort sur !_moonOn). _moonEnsure() l'ouvre quand la
     // nuit tombe -- il savait deja CREER a la demande, pas RELACHER.
@@ -1464,11 +1491,11 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // E.T. : un tap sur la lune relance le passage. Hit-test sur le disque, pas de
     // calque cliquable : .winner (z-index 2) couvre la card et doit garder ses clics.
     this._elCard.addEventListener('click', e => {
-      if (!this._etOn || e.target.closest('[data-atmo],[data-t]')) return;
+      if (!(this._etOn || this._noelOn) || e.target.closest('[data-atmo],[data-t]')) return;
       const r = this._elCard.getBoundingClientRect();
       const R = this._config.fx_lune_taille / 2;
       const dx = e.clientX - (r.right - 16 - R), dy = e.clientY - (r.top + 8 + R);
-      if (dx * dx + dy * dy <= R * R * 1.3) this._etPass(0);
+      if (dx * dx + dy * dy <= R * R * 1.3) { if (this._noelOn) this._noelPass(0); else this._etPass(0); }
     });
 
     // Délégation de clic → more-info HA (pastilles Atmo + température). Posé 1x.
@@ -1541,6 +1568,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._aurStop();
     WNC_GL.release(this);   // le contexte partage survit 30 s : un rattachement le retrouve
     this._etStop(); this._etOn = false;
+    this._noelStop(); this._noelOn = false;
     clearTimeout(this._frostReflow); this._frostReflow = null;
     this._fxFlakes = null; this._fxFlakeKey = null; this._fxSnowLast = 0;
     for (const k of ['_fxRAF', '_frostRAF', '_heatRAF']) if (this[k]) { cancelAnimationFrame(this[k]); this[k] = null; }
@@ -2369,7 +2397,14 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // que ce truc existe.
     const nightNow = this._isNight || NIGHT_CONDS.has(cond);
     if (fxOn && nightNow) this._startNight(); else this._stopNight();
-    this._moonMode = this._config.fx_lune_etoile_toujours ? 2 : (this._config.fx_lune_rouge_toujours ? 1 : 0);
+    // Dates fixes, la nuit seulement : 31/10 et vendredi 13 -> lune rouge, 4 mai -> Etoile.
+    // -12 h : une nuit porte la date de son soir, pas celle d'apres minuit.
+    const eve = new Date(Date.now() - 43200000);
+    const eM = eve.getMonth() + 1, eD = eve.getDate();
+    const dateMode = !(this._config.fx_lune_dates && nightNow) ? 0
+      : (eM === 5 && eD === 4) ? 2
+      : ((eM === 10 && eD === 31) || (eD === 13 && eve.getDay() === 5)) ? 1 : 0;
+    this._moonMode = this._config.fx_lune_etoile_toujours ? 2 : (this._config.fx_lune_rouge_toujours ? 1 : dateMode);
     this._moonOn = !!(this._config.fx_lune && (nightNow || this._config.fx_lune_toujours || this._moonMode));
     this._moonEnsure();
     // AURORE (easter egg) : lune NOIRE + ciel DEGAGE + nuit. Les trois, sans quoi
@@ -2384,7 +2419,14 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // E.T. (easter egg) : PLEINE lune + ciel DEGAGE + nuit, symetrique de l'aurore.
     // Front montant = un passage quand la card s'affiche (le ménage remet _etOn a
     // false), puis au tap sur la lune. `fx_et_toujours` = demo, jamais en prod.
-    const etNow = !!this._config.fx_et && (this._config.fx_et_toujours ||
+    // Pere Noel : toutes les nuits de decembre (date du soir, cf `eve`), ciel quelconque
+    // puisque la lune s'affiche toutes les nuits. Prend la place d'E.T. ce mois-la.
+    const noelNow = !!this._config.fx_noel && (this._config.fx_noel_toujours ||
+      (nightNow && this._moonOn && eM === 12));
+    if (noelNow && !this._noelOn) this._noelPass(900);
+    if (!noelNow) this._noelStop();
+    this._noelOn = noelNow;
+    const etNow = !noelNow && !!this._config.fx_et && (this._config.fx_et_toujours ||
       (nightNow && cond === 'clear-night' &&
        this._aurMoonLit() >= this._config.fx_et_lune));
     if (etNow && !this._etOn) this._etPass(900);
@@ -4318,6 +4360,98 @@ void main(){
     if (this._etAnim) { for (const a of this._etAnim) a.cancel(); this._etAnim = null; }
   }
 
+  // Silhouette du cortege pour n rennes (viewBox 0 0 W 40), recopiee du banc.
+  // Pattes = <g class="leg"> tournant autour de la hanche (data-hx/hy), rennes = .bob.
+  _noelSil(n) {
+    const RS = 26, SLED = 46, W = SLED + n * RS, xl = SLED + (n - 1) * RS;
+    const leg = (hx, hy, b, ph) => '<g class="leg" data-hx="' + hx + '" data-hy="' + hy + '" data-b="' + b +
+      '" data-ph="' + ph + '"><path fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M' +
+      hx + ' ' + hy + ' l0 5 l1.5 4.5"/></g>';
+    let h = '<path fill="none" stroke-width="1.7" stroke-linecap="round" d="M2 36.5 L35 36.5 C40.5 36.5 42.5 33 44 29.5 M10 32 L10 36.5 M27 32 L27 36.5"/>' +
+      '<path d="M4 22 C2.5 16 3.4 11.6 6.2 10.8 L9.4 12 L9 22 L30 22 C34 22 36 18.4 38 15.2 L40.4 15.2 L38.4 24.4 C36.6 30.2 32.4 32.4 26.2 32.4 L8.4 32.4 C5.2 32.4 4 28.4 4 22 Z"/>' +
+      '<path d="M9.4 22 C7.6 14.6 10 9.4 13.6 9.2 C17.4 9.4 19.4 14.4 18.4 22 Z"/><path fill="none" stroke-width="1.1" stroke-linecap="round" d="M13.4 9.4 L12.4 6.6 M13.8 9.4 L15.6 7"/>' +
+      '<path d="M18.6 22 C18.4 15.4 21.2 12.4 25 12.4 C28.8 12.4 31.4 15.8 31.2 22 Z"/>' +
+      '<circle cx="25.2" cy="9.2" r="3.6"/><path d="M21.8 8.4 C22.6 3.4 27 1.6 31.4 3.8 L29 7.6 Z"/><circle cx="31.8" cy="4.4" r="1.3"/>' +
+      '<path fill="none" stroke-width="1.8" stroke-linecap="round" d="M28.4 15.6 L35.4 14"/>' +
+      '<path fill="none" stroke-width="0.7" d="M35.4 14 L' + (xl + 16) + ' 18.4"/>' +
+      '<path fill="none" stroke-width="0.9" d="M39 22.5 L' + (xl + 12) + ' 22.5"/>';
+    for (let i = 0; i < n; i++) {
+      h += '<g transform="translate(' + (SLED + i * RS) + ' 0)"><g class="bob">' +
+        '<ellipse cx="11" cy="20" rx="8.2" ry="3.9"/>' +
+        '<path d="M15.5 18.5 L20 11.5 L23.5 10 L26.5 11.6 L23.6 13.4 L19.8 20.6 Z"/>' +
+        '<path d="M3.4 18.6 L1 16.8 L3.2 19.8 Z"/>' +
+        '<path fill="none" stroke-width="1" stroke-linecap="round" d="M21.6 10.6 L19.6 5.4 L17.4 4.2 M19.9 6.3 L21.6 3.3 M22.8 10.2 L24.6 5.2 L26.9 4.2 M24.3 6.1 L23.6 2.9"/>' +
+        leg(15.5, 22, -38, 0) + leg(13.5, 22.4, -30, 1.2) + leg(7.5, 22, 42, 2.4) + leg(5.5, 21.6, 34, 3.6) +
+        (i === n - 1 ? '<circle class="nose" cx="26.6" cy="11.8" r="1.25" stroke="none" fill="#ff2a2a"/>' : '') +
+        '</g></g>';
+    }
+    return { html: h, W: W };
+  }
+
+  // Un passage du traineau : meme trajectoire et meme one-shot qu'_etPass. Pattes et
+  // tangage = cycles courts repetes un nombre FINI de fois, rien ne tourne apres.
+  _noelPass(delay) {
+    const svg = this._elNoel;
+    if (!svg || !svg.animate) return;
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    clearTimeout(this._noelTimer);
+    this._noelTimer = setTimeout(() => {
+      this._noelTimer = null;
+      const Wc = this._elCard ? this._elCard.getBoundingClientRect().width : 0;
+      if (!Wc) return;
+      const c = this._config, R = c.fx_lune_taille / 2;
+      const n = Math.max(1, Math.min(9, Math.round(c.fx_noel_rennes)));
+      if (svg._n !== n) {
+        const s = this._noelSil(n);
+        svg.innerHTML = s.html; svg.setAttribute('viewBox', '0 0 ' + s.W + ' 40');
+        svg._n = n; svg._W = s.W;
+      }
+      const nose = svg.querySelector('.nose');
+      if (nose) {
+        nose.style.opacity = c.fx_noel_nez;
+        nose.style.filter = c.fx_noel_nez > 0 ? 'drop-shadow(0 0 ' + (1.5 * c.fx_noel_nez).toFixed(2) + 'px #ff2a2a)' : 'none';
+      }
+      const cx = Wc - (16 + R), cy = 8 + R;
+      const w = c.fx_noel_echelle * 2 * R, h = w * 40 / svg._W;
+      svg.style.width = w + 'px'; svg.style.height = h + 'px';
+      const D = c.fx_noel_duree, N = Math.max(24, Math.ceil(D * 24)), body = [];
+      for (let i = 0; i <= N; i++) {
+        const p = i / N;
+        const x = cx + (p * 2 - 1) * c.fx_noel_etendue * R;
+        const y = cy + c.fx_noel_passage * R + (0.5 - p) * c.fx_noel_montee * R
+                - 4 * p * (1 - p) * c.fx_noel_arc * R;
+        const dx = 2 * c.fx_noel_etendue * R;
+        const dy = -c.fx_noel_montee * R - 4 * (1 - 2 * p) * c.fx_noel_arc * R;
+        const ang = Math.atan2(dy, dx) * 180 / Math.PI + c.fx_noel_cabre;
+        body.push({ opacity: 1, transform: 'translate(' + (x - w / 2).toFixed(2) + 'px,' +
+          (y - h / 2).toFixed(2) + 'px) rotate(' + ang.toFixed(2) + 'deg)' });
+      }
+      this._noelStop(true);
+      this._noelAnim = [svg.animate(body, { duration: D * 1000, easing: 'linear' })];
+      // un cycle echantillonne, rejoue jusqu'a couvrir la duree du passage
+      const loop = (el, omega, f) => {
+        const T = 2 * Math.PI / omega, K = 12, kf = [];
+        for (let k = 0; k <= K; k++) kf.push({ transform: f(k / K * T) });
+        this._noelAnim.push(el.animate(kf, { duration: T * 1000, iterations: Math.ceil(D / T), easing: 'linear' }));
+      };
+      if (c.fx_noel_galop > 0) for (const l of svg.querySelectorAll('.leg')) {
+        const hx = +l.dataset.hx, hy = +l.dataset.hy, b = +l.dataset.b, ph = +l.dataset.ph;
+        loop(l, 11, t => 'translate(' + hx + 'px,' + hy + 'px) rotate(' +
+          (b + c.fx_noel_galop * 22 * Math.sin(t * 11 + ph)).toFixed(1) + 'deg) translate(' + (-hx) + 'px,' + (-hy) + 'px)');
+      } else for (const l of svg.querySelectorAll('.leg')) {
+        const hx = +l.dataset.hx, hy = +l.dataset.hy;
+        l.setAttribute('transform', 'rotate(' + l.dataset.b + ' ' + hx + ' ' + hy + ')');
+      }
+      if (c.fx_noel_houle > 0) svg.querySelectorAll('.bob').forEach((g, i) =>
+        loop(g, 5.5, t => 'translate(0px,' + (c.fx_noel_houle * 2.2 * Math.sin(t * 5.5 - i * 0.9)).toFixed(2) + 'px)'));
+    }, delay || 0);
+  }
+
+  _noelStop(keepTimer) {
+    if (!keepTimer) { clearTimeout(this._noelTimer); this._noelTimer = null; }
+    if (this._noelAnim) { for (const a of this._noelAnim) a.cancel(); this._noelAnim = null; }
+  }
+
   _aurMoonLit() { return (1 - Math.cos(moonPhase() * 2 * Math.PI)) / 2; }
 
   _aurInit() {
@@ -4715,6 +4849,9 @@ WeatherNeonCardWebgl.styles = `
   :host([moongl]) .wmoongl { display:block; }
   /* E.T. : au-dessus de la lune (meme z-index, plus loin dans le DOM), invisible au
      repos -- seule l'animation one-shot le fait apparaitre (fill:none au retour). */
+  .wnoel { position:absolute; left:0; top:0; z-index:1; overflow:visible; opacity:0;
+           transform-origin:50% 50%; pointer-events:none; }
+  .wnoel g { transform-origin:0 0; }
   .wet { position:absolute; left:0; top:0; z-index:1; overflow:visible; opacity:0;
          transform-origin:50% 50%; pointer-events:none; }
   /* le sprite SVG ne s'efface que si la lune GL est REELLEMENT vivante */
@@ -5723,7 +5860,8 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     });
 
     this._group('Lune — easter eggs (lune rouge, Étoile de la Mort)', false, () => {
-      this._hint("Déclenchement réel à définir : seuls les interrupteurs de démo existent pour l'instant, jamais en prod. L'Étoile de la Mort l'emporte si les deux sont actifs.");
+      this._hint("Dates fixes, la nuit : 31/10 et vendredi 13 → lune rouge, 4 mai → Étoile de la Mort. La lune suit sa phase réelle. Les interrupteurs « toujours » = démo, jamais en prod ; l'Étoile l'emporte si les deux sont actifs.");
+      this._toggle('fx_lune_dates', 'Dates fixes (31/10, vendredi 13, 4 mai)', true);
       this._toggle('fx_lune_rouge_toujours', 'Lune rouge + crâne — toujours (démo)', false);
       this._toggle('fx_lune_etoile_toujours', 'Étoile de la Mort — toujours (démo)', false);
       this._number('fx_lune_rouge', 'Lune rouge — teinte sang', { min: 0, max: 1, step: 0.01, ph: '0.90' });
@@ -5775,6 +5913,23 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._number('fx_et_arc', 'Arc (x rayon)', { min: -0.5, max: 0.5, step: 0.01, ph: '0.12' });
       this._number('fx_et_cabre', 'Cabré (°)', { min: -30, max: 30, step: 1, ph: '-6' });
       this._number('fx_et_ondule', 'Battement de la cape', { min: 0, max: 1.5, step: 0.05, ph: '0.50' });
+    });
+
+    this._group('Père Noël en décembre (easter egg)', false, () => {
+      this._hint("Toutes les nuits de décembre, le traîneau passe devant la lune (à la place d'E.T.) : un passage à l'affichage, puis à chaque tap sur la lune. fx_noel_toujours = mode démo, jamais en prod.");
+      this._toggle('fx_noel', 'Activer', true);
+      this._toggle('fx_noel_toujours', 'Toujours actif (démo)', false);
+      this._number('fx_noel_echelle', 'Largeur du cortège (x diamètre)', { min: 0.1, max: 2.5, step: 0.01, ph: '0.40' });
+      this._number('fx_noel_rennes', 'Nombre de rennes', { min: 1, max: 9, step: 1, ph: '4' });
+      this._number('fx_noel_duree', 'Durée du passage (s)', { min: 1.5, max: 15, step: 0.1, ph: '6.0' });
+      this._number('fx_noel_etendue', 'Étendue (x rayon)', { min: 1, max: 4, step: 0.05, ph: '2.20' });
+      this._number('fx_noel_passage', 'Hauteur de passage (x rayon)', { min: -0.8, max: 0.8, step: 0.02, ph: '0.00' });
+      this._number('fx_noel_montee', 'Montée (x rayon)', { min: 0, max: 1.5, step: 0.02, ph: '0.35' });
+      this._number('fx_noel_arc', 'Arc (x rayon)', { min: 0, max: 0.8, step: 0.02, ph: '0.32' });
+      this._number('fx_noel_cabre', 'Cabré (°)', { min: -20, max: 20, step: 1, ph: '0' });
+      this._number('fx_noel_galop', 'Galop des rennes', { min: 0, max: 1.5, step: 0.05, ph: '0.80' });
+      this._number('fx_noel_houle', "Tangage de l'attelage", { min: 0, max: 1, step: 0.05, ph: '1.00' });
+      this._number('fx_noel_nez', 'Nez de Rudolph (0 = ombre pure)', { min: 0, max: 1, step: 0.05, ph: '1.00' });
     });
 
     this._group("Transverses (cumuls d'effets)", false, () => {

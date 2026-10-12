@@ -26,10 +26,13 @@ The card reads your `weather.*` entity and turns the condition into a scene. Rai
 
 Both follow the real moon phase. To see them without waiting, set `fx_et_toujours: true` or `fx_aurore_toujours: true` (demo modes, not meant to stay on).
 
-Two more are demo-only for now, with no automatic trigger yet. Switch them on by hand:
+Three more come back on fixed dates, at night only (a night counts as the date of its evening, so after midnight still counts):
 
-- `fx_lune_rouge_toujours: true`: a blood-red moon with a skull imprinted on the lunar seas.
-- `fx_lune_etoile_toujours: true`: the moon is replaced by a battle station that is definitely not a moon (wins over the red moon if both are on).
+- **October 31 and every Friday the 13th**: a blood-red moon with a skull imprinted on the lunar seas.
+- **May 4**: the moon is replaced by a battle station that is definitely not a moon.
+- **Every night of December**: Santa's sleigh and his reindeer (Rudolph leading, red nose on) fly across the moon, once when the card appears and again on every tap on the moon. It takes E.T.'s place for the month.
+
+To see them on any day: `fx_lune_rouge_toujours: true`, `fx_lune_etoile_toujours: true` (wins over the red moon if both are on) or `fx_noel_toujours: true` (demo modes, not meant to stay on). `fx_lune_dates: false` turns the date triggers off.
 
 <img src="https://raw.githubusercontent.com/cerealkiller57540/weather-neon-card/main/images/death-star.jpg" alt="The moon replaced by the Death Star above a clear night sky" width="520">
 
@@ -118,7 +121,9 @@ pollen_entity: sensor.atmo_france_qualite_globale_pollen_<zone>
 | `fx_lune` / `fx_lune_taille` | `true` / `96` | Photographic moon with its real phase, size in px |
 | `fx_aurore` / `fx_aurore_toujours` | `true` / `false` | Aurora easter egg / demo mode |
 | `fx_et` / `fx_et_toujours` | `true` / `false` | Full-moon easter egg / demo mode |
-| `fx_lune_rouge_toujours` / `fx_lune_etoile_toujours` | `false` / `false` | Blood-red moon with skull / battle-station moon (demo switches; tune them in the editor's moon easter egg group) |
+| `fx_lune_dates` | `true` | Fixed-date moon easter eggs (Oct 31 and Friday the 13th: red moon; May 4: battle station) |
+| `fx_lune_rouge_toujours` / `fx_lune_etoile_toujours` | `false` / `false` | Blood-red moon with skull / battle-station moon, demo switches (tune them in the editor's moon easter egg group) |
+| `fx_noel` / `fx_noel_toujours` | `true` / `false` | December sleigh easter egg / demo mode (size, reindeer count, path, gallop and Rudolph's nose in the editor) |
 | `largeur_ref` | `380` | Width the card is drawn at; narrower columns scale the whole block |
 | `show_clock` | `false` | Time banner at the top of the card (the card grows by about 18 px) |
 | `clock_align` / `clock_size` | `center` / `18` | `center` or `left`; time size in px |
