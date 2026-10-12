@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.9.0
+ * weather-neon-card v3.10.0
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.9.0';
+const VERSION = '3.10.0';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -446,6 +446,29 @@ function buildConfig(raw) {
     fx_noel_galop:    _n(raw.fx_noel_galop,    0.80),   // amplitude des pattes
     fx_noel_houle:    _n(raw.fx_noel_houle,    1.00),   // tangage de chaque renne
     fx_noel_nez:      _n(raw.fx_noel_nez,      1.00),   // nez rouge de Rudolph, 0 = ombre pure
+    // EASTER EGG FEU D'ARTIFICE : la nuit du 14 juillet (tricolore) et du 31/12 (or +
+    // multicolore), canvas 2D. Valeurs reglees au banc feu_bench.html (12/10/2026) :
+    // ne pas les rechoisir au juge. `fx_feu_toujours` = demo (true = date de fete,
+    // 'nouvel_an' = palette or).
+    fx_feu:            raw.fx_feu ?? true,
+    fx_feu_toujours:   raw.fx_feu_toujours ?? false,
+    fx_feu_dates:      raw.fx_feu_dates ?? '07-14',                    // MM-JJ, separees par des virgules
+    fx_feu_couleurs:   raw.fx_feu_couleurs ?? '#2f6bff,#f4f7ff,#ff2a3a', // palette des dates de fete
+    fx_feu_fusees:     _n(raw.fx_feu_fusees,     6),      // gerbes par salve
+    fx_feu_duree:      _n(raw.fx_feu_duree,      3.0),    // departs etales sur cette duree (s)
+    fx_feu_particules: _n(raw.fx_feu_particules, 100),    // etincelles par gerbe
+    fx_feu_rayon:      _n(raw.fx_feu_rayon,      75),     // rayon d'une gerbe (px)
+    fx_feu_hauteur:    _n(raw.fx_feu_hauteur,    0.20),   // eclatements, fraction des 240 px du haut
+    fx_feu_gravite:    _n(raw.fx_feu_gravite,    55),     // px/s2
+    fx_feu_vie:        _n(raw.fx_feu_vie,        2.50),   // vie d'une etincelle (s)
+    fx_feu_trainee:    _n(raw.fx_feu_trainee,    0.80),   // 0 = points nets
+    fx_feu_eclat:      _n(raw.fx_feu_eclat,      1.00),   // halo de chaque etincelle
+    fx_feu_melange:    _n(raw.fx_feu_melange,    0.50),   // 0 = une couleur par gerbe
+    fx_feu_crepite:    _n(raw.fx_feu_crepite,    0.85),   // scintillement en fin de vie
+    fx_feu_fusee:      _n(raw.fx_feu_fusee,      0.60),   // trace de la montee
+    // POISSON D'AVRIL : le 1er avril, une meteo absurde pendant 3 s a l'affichage.
+    fx_avril:          raw.fx_avril ?? true,
+    fx_avril_toujours: raw.fx_avril_toujours ?? false,
     // 0.563 : rideau remonte de 3 px sur une couche de ~234 px (3/234 ~ 0.013).
     fx_aurore_base:      _n(raw.fx_aurore_base,      0.563),
     fx_aurore_amplitude: _n(raw.fx_aurore_amplitude, 0.24),
@@ -483,6 +506,21 @@ function buildConfig(raw) {
     clock_size:    _n(raw.clock_size, 18),
     show_name:     (raw.show_name ?? true) && raw.name !== '',  // false -> pas de libelle de lieu
     glitch:        raw.glitch        ?? true,  // GLITCH le chat réactif à la météo
+    // Valeurs réglées à l'œil au banc (gen_glitch_bench.py, 2026-10-12) : ne pas les rechoisir au jugé.
+    fx_glitch_plisse:      _n(raw.fx_glitch_plisse, 0.55),      // brouillard : 0 = yeux ouverts, 1 = fermés
+    fx_glitch_vent_seuil:  _n(raw.fx_glitch_vent_seuil, 35),    // km/h, écharpe au-delà
+    fx_glitch_echarpe_amp: _n(raw.fx_glitch_echarpe_amp, 2.5),  // battement du pan, unités du dessin
+    fx_glitch_echarpe_per: _n(raw.fx_glitch_echarpe_per, 0.6),  // s
+    fx_glitch_boule:       _n(raw.fx_glitch_boule, 0.85),       // nuit : écrasement vertical
+    fx_glitch_souffle:     _n(raw.fx_glitch_souffle, 0.04),     // nuit : amplitude de la respiration
+    fx_glitch_z_taille:    _n(raw.fx_glitch_z_taille, 8),
+    fx_glitch_z_periode:   _n(raw.fx_glitch_z_periode, 2.6),    // s
+    fx_glitch_nuit_dehors: raw.fx_glitch_nuit_dehors ?? true,   // reste sorti toute la nuit claire
+    fx_glitch_grelot:      _n(raw.fx_glitch_grelot, 1.2),       // px
+    fx_glitch_clin_delai:  _n(raw.fx_glitch_clin_delai, 120),   // ms après l'éclair
+    fx_glitch_clin_duree:  _n(raw.fx_glitch_clin_duree, 450),   // ms yeux fermés
+    fx_glitch_sortie_min:  _n(raw.fx_glitch_sortie_min, 4),     // s, pluie/orage/neige
+    fx_glitch_sortie_max:  _n(raw.fx_glitch_sortie_max, 8),
     particles:     raw.particles     ?? true,  // effets atmosphériques (CSS + canvas)
     frost:         raw.frost         ?? true,  // cristaux de givre quand temp ≤ frost_below
     frost_below:   raw.frost_below   ?? 3,     // seuil °C de déclenchement du givre
@@ -774,24 +812,31 @@ function glitchAccessory(cond) {
     return `<polygon points="44,1 38,12 42.5,12 37,21 47,9.5 42.5,9.5 46,1" fill="#ffe14d"/>`; // éclair
   return '';
 }
-// classe d'animation selon météo : grelotte si froid/neige, affolé si orage
-function glitchMood(cond) {
-  if (['snowy', 'hail', 'snowy-rainy'].includes(cond)) return 'wcat-shiver';
+// classe d'animation selon météo : grelotte si froid/neige/gel, affolé si orage,
+// plisse au brouillard, dort la nuit claire.
+function glitchMood(cond, o = {}) {
+  if (cond === 'clear-night') return 'wcat-sleep' + (o.nuitDehors ? ' wcat-out' : '');
+  if (['snowy', 'hail', 'snowy-rainy'].includes(cond) || o.gel) return 'wcat-shiver';
   if (STORM_CONDS.has(cond)) return 'wcat-crazy';
+  if (cond === 'fog') return 'wcat-fog';
   return '';
 }
+const GLITCH_ACTIVE = new Set(['rainy', 'pouring', 'snowy', 'snowy-rainy', 'hail', 'lightning', 'lightning-rainy']);
 // génère le bloc GLITCH (3 calques rouge/cyan/principal en screen → aberration RGB).
 // mainColor = couleur du calque principal : vert plasma au repos, ou couleur de
 // vigilance (jaune/orange/rouge) quand une alerte est active → GLITCH "s'alarme".
-function glitchHtml(cond, mainColor = '#4AF2A1') {
-  const acc = glitchAccessory(cond);
-  const mood = glitchMood(cond);
-  // paupière (wink) sur le calque principal : prend la couleur principale (se fond dans la peau)
-  const lid = `<path class="wcat-lid" fill="${mainColor}" d="M26.631 26.571h5.455v5.455h-5.455Z"/>`;
+function glitchHtml(cond, mainColor = '#4AF2A1', o = {}) {
+  let acc = glitchAccessory(cond);
+  if (o.vent) acc += `<rect x="10.3" y="32.03" width="27.3" height="2.7" fill="#ffe14d"/><g class="wcat-scarf"><rect x="37.5" y="32.4" width="4.4" height="2.4" fill="#ffe14d"/><rect x="41.9" y="33" width="4" height="2.2" fill="#ffe14d"/><rect x="45.9" y="32.6" width="3.6" height="2" fill="#ffe14d"/></g>`; // écharpe
+  if (cond === 'clear-night') acc += `<g class="wcat-z"><text x="38" y="12" fill="${mainColor}">z</text><text x="38" y="12" fill="${mainColor}">z</text><text x="38" y="12" fill="${mainColor}">z</text></g>`;
+  const mood = glitchMood(cond, o);
+  // paupières sur le calque principal : prennent la couleur principale (se fondent dans la peau).
+  // wcat-lid (œil droit) sert aussi au wink ; wcat-lidl (gauche) seulement à plisser/fermer.
+  const lid = `<path class="wcat-lid" fill="${mainColor}" d="M26.631 26.571h5.455v5.455h-5.455Z"/><path class="wcat-lidl" fill="${mainColor}" d="M15.724 26.571h5.455v5.455h-5.455Z"/>`;
   const layer = (color, cls, withAcc) =>
     `<svg viewBox="0 0 51 46" class="${cls}"><path fill="${color}" d="${GLITCH_PATH}"/>${withAcc ? acc + lid : ''}</svg>`;
   // glow assorti à la couleur principale (via variable CSS lue par .wcat)
-  return `<div class="wcat ${mood}" style="--cat-glow:${mainColor}">
+  return `<div class="wcat ${mood}" style="--cat-glow:${mainColor};${o.vars || ''}">
     ${layer('#ff2d6b', 'wcat-r', false)}
     ${layer('#00e5ff', 'wcat-c', false)}
     ${layer(mainColor, 'wcat-m', true)}
@@ -1096,6 +1141,30 @@ const _EN = {
  "Dérive": "Drift",
  "E.T. pleine lune (easter egg)": "E.T. full moon (easter egg)",
  "Père Noël en décembre (easter egg)": "Santa in December (easter egg)",
+ "Feu d'artifice (easter egg)": "Fireworks (easter egg)",
+ "La nuit des dates de fête (MM-JJ, plusieurs séparées par des virgules, 07-14 par défaut) aux couleurs choisies, et du Nouvel An (or) : une salve à l'affichage puis à chaque tap sur la lune. Le 31/12, le traîneau passe d'abord. fx_feu_toujours = mode démo (true ou 'nouvel_an'), jamais en prod.": "On the night of your celebration dates (MM-DD, comma-separated, 07-14 by default) in the colours you pick, and on New Year's Eve (gold): one salvo when the card shows, then on every tap on the moon. On Dec 31 the sleigh flies first. fx_feu_toujours = demo mode (true or 'nouvel_an'), never in production.",
+ "Dates de fête (MM-JJ)": "Celebration dates (MM-DD)",
+ "Couleurs de la fête": "Celebration colours",
+ "Fusées par salve": "Rockets per salvo",
+ "Durée de la salve (s)": "Salvo duration (s)",
+ "Particules par gerbe": "Sparks per burst",
+ "Rayon de la gerbe (px)": "Burst radius (px)",
+ "Hauteur des éclatements": "Burst height",
+ "Gravité": "Gravity",
+ "Vie d'une étincelle (s)": "Spark lifetime (s)",
+ "Traînée": "Trail",
+ "Mélange des couleurs": "Colour mix",
+ "Crépitement": "Crackle",
+ "Trace de la fusée": "Rocket trail",
+ "Poisson d'avril (easter egg)": "April Fools (easter egg)",
+ "Le 1er avril, une météo absurde s'affiche 3 s, puis l'aveu. fx_avril_toujours = mode démo, jamais en prod.": "On April 1st, absurd weather shows for 3 s, then the confession. fx_avril_toujours = demo mode, never in production.",
+ "Pluie de grenouilles": "Raining frogs",
+ "Averses de confettis": "Confetti showers",
+ "Brouillard de guimauve": "Marshmallow fog",
+ "Neige au chocolat": "Chocolate snow",
+ "Tornade de chats": "Cat tornado",
+ "Grêle de croquettes": "Kibble hail",
+ "Poisson d'avril !": "April Fools!",
  "Toutes les nuits de décembre, le traîneau passe devant la lune (à la place d'E.T.) : un passage à l'affichage, puis à chaque tap sur la lune. fx_noel_toujours = mode démo, jamais en prod.": "Every December night, the sleigh flies across the moon (instead of E.T.): one flyby when the card shows, then on every tap on the moon. fx_noel_toujours = demo mode, never in production.",
  "Largeur du cortège (x diamètre)": "Sleigh team width (x diameter)",
  "Nombre de rennes": "Number of reindeer",
@@ -1125,6 +1194,21 @@ const _EN = {
  "Fréquence": "Frequency",
  "GLITCH le chat": "GLITCH the cat",
  "GLITCH le chat 🐱": "GLITCH the cat 🐱",
+ "Brouillard : yeux plissés (0-1)": "Fog: squinted eyes (0-1)",
+ "Vent : seuil de l'écharpe (km/h)": "Wind: scarf threshold (km/h)",
+ "Écharpe : amplitude": "Scarf: amplitude",
+ "Écharpe : période (s)": "Scarf: period (s)",
+ "Nuit : en boule": "Night: curled up",
+ "Nuit : respiration": "Night: breathing",
+ "Nuit : taille des z": "Night: z size",
+ "Nuit : montée d'un z (s)": "Night: z rise (s)",
+ "Nuit : dort dehors": "Night: sleeps outside",
+ "Gel : grelottement (px)": "Frost: shiver (px)",
+ "Éclair : délai du clin d'œil (ms)": "Lightning: blink delay (ms)",
+ "Éclair : yeux fermés (ms)": "Lightning: eyes closed (ms)",
+ "Météo active : sortie min (s)": "Active weather: min interval (s)",
+ "Météo active : sortie max (s)": "Active weather: max interval (s)",
+ "GLITCH réagit à la météo : plisse les yeux au brouillard, écharpe au-delà du seuil de vent, dort en boule la nuit claire, grelotte au gel, ferme les yeux aux éclairs. Par pluie, orage ou neige, il sort plus souvent.": "GLITCH reacts to the weather: squints in fog, wears a scarf above the wind threshold, sleeps curled up on clear nights, shivers in frost, closes its eyes at lightning. In rain, storms or snow it pops out more often.",
  "Givre": "Frost",
  "Glissement (rack focus)": "Sliding (rack focus)",
  "Glow": "Glow",
@@ -1446,6 +1530,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
         <canvas class="wmoongl"></canvas>
         <svg class="wet" viewBox="0 0 100 60" aria-hidden="true" fill="#000" stroke="#000"><g class="wetcape"><path d="M45 12.5 C36 10.5 24 11.5 11 19.5 C15 20.5 17 22 15 25.5 C23 22.5 30 25.5 36 29.5 L44 22 Z"/></g><g fill="none" stroke-linecap="round" stroke-linejoin="round"><circle cx="22" cy="47" r="10.3" stroke-width="2.4"/><circle cx="70" cy="47" r="10.3" stroke-width="2.4"/><path stroke-width="1.9" d="M22 47 L40 47 L35 31 Z M40 47 L62 30 M35.5 32.5 L62 30.5 M62 30 L70 47 M62 30 L60.5 22 M57 21.5 L64.5 20.5"/><path stroke-width="1.6" d="M40 47 L42.5 51.5 M22 47 L22 47.1 M70 47 L70 47.1"/><path stroke-width="2.8" d="M47 17 L59.5 21.5"/><path stroke-width="3.1" d="M37 29.5 L47.5 35.5 L42.8 51"/></g><path d="M34 31 C35 24 40 17 45.5 12.5 L50.5 15.5 C47.5 21 44.5 26 42.5 31.5 Z"/><circle cx="49" cy="8.6" r="4.6"/><rect x="58" y="17.5" width="14.5" height="9" rx="1.2"/><path d="M59.4 18.5 C58.8 10.5 61 3.2 65.8 2.2 C70.6 3.2 73 10.5 72.4 18.5 Z"/></svg>
         <svg class="wnoel" aria-hidden="true" fill="#000" stroke="#000"></svg>
+        <canvas class="wfeu" aria-hidden="true"></canvas>
         <div class="wbeam"></div>
         ${this._config.neon_fx ? '<div class="wscan"></div>' : ''}
         <div class="winner"></div>
@@ -1462,6 +1547,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._elMoonGl = this.shadowRoot.querySelector('.wmoongl');
     this._elEt = this.shadowRoot.querySelector('.wet');
     this._elNoel = this.shadowRoot.querySelector('.wnoel');
+    this._elFeu = this.shadowRoot.querySelector('.wfeu');
     // PAS de _moonInit() ici : en plein jour ce contexte restait ouvert
     // a ne rien peindre (_moonDraw sort sur !_moonOn). _moonEnsure() l'ouvre quand la
     // nuit tombe -- il savait deja CREER a la demande, pas RELACHER.
@@ -1491,11 +1577,14 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // E.T. : un tap sur la lune relance le passage. Hit-test sur le disque, pas de
     // calque cliquable : .winner (z-index 2) couvre la card et doit garder ses clics.
     this._elCard.addEventListener('click', e => {
-      if (!(this._etOn || this._noelOn) || e.target.closest('[data-atmo],[data-t]')) return;
+      if (!(this._etOn || this._noelOn || this._feuOn) || e.target.closest('[data-atmo],[data-t]')) return;
       const r = this._elCard.getBoundingClientRect();
       const R = this._config.fx_lune_taille / 2;
       const dx = e.clientX - (r.right - 16 - R), dy = e.clientY - (r.top + 8 + R);
-      if (dx * dx + dy * dy <= R * R * 1.3) { if (this._noelOn) this._noelPass(0); else this._etPass(0); }
+      if (dx * dx + dy * dy <= R * R * 1.3) {
+        if (this._feuOn) this._feuSalve(0, this._feuOn);
+        else if (this._noelOn) this._noelPass(0); else this._etPass(0);
+      }
     });
 
     // Délégation de clic → more-info HA (pastilles Atmo + température). Posé 1x.
@@ -1569,6 +1658,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     WNC_GL.release(this);   // le contexte partage survit 30 s : un rattachement le retrouve
     this._etStop(); this._etOn = false;
     this._noelStop(); this._noelOn = false;
+    this._feuStop(); this._feuOn = 0;
+    this._avrilStop(); this._avrilOn = false;
     clearTimeout(this._frostReflow); this._frostReflow = null;
     this._fxFlakes = null; this._fxFlakeKey = null; this._fxSnowLast = 0;
     for (const k of ['_fxRAF', '_frostRAF', '_heatRAF']) if (this[k]) { cancelAnimationFrame(this[k]); this[k] = null; }
@@ -1899,6 +1990,23 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const H = Math.min(this._fxH || cv._h, cv._h);
     this._bolt = { segs: this._genBolt(cv._w, H), t0: performance.now() };
     this._ensureFxLoop();
+    this._glitchBlink();
+  }
+
+  // GLITCH ferme les yeux à l'éclair ; caché, il sort d'abord (≈0.5 s pour émerger du divider).
+  _glitchBlink() {
+    const c = this._config;
+    const cat = c.glitch && this._elInner && this._elInner.querySelector('.wcat');
+    if (!cat || this.classList.contains('w-narrow')) return;
+    let wait = c.fx_glitch_clin_delai;
+    if (!cat.classList.contains('wcat-pop') && !cat.classList.contains('wcat-out')) {
+      if (this._glitchPop) this._glitchPop();
+      wait += 520;
+    }
+    setTimeout(() => {
+      cat.classList.add('wcat-blink');
+      setTimeout(() => cat.classList.remove('wcat-blink'), c.fx_glitch_clin_duree);
+    }, wait);
   }
 
   _drawBolt(ctx, W, H, now) {
@@ -2303,7 +2411,16 @@ class WeatherNeonCardWebgl extends HTMLElement {
       const cl = clState && String(clState.state).trim();
       if (cl && !['unknown', 'unavailable', 'none', ''].includes(cl.toLowerCase())) condLabel = cl;
     }
-    const glitch = this._config.glitch ? glitchHtml(cond, catColor) : '';
+    const gc = this._config;
+    this._glitchActive = GLITCH_ACTIVE.has(cond);
+    const glitch = gc.glitch ? glitchHtml(cond, catColor, {
+      vent: Number(windVal) >= gc.fx_glitch_vent_seuil,
+      gel: !!gc.fx_givre_toujours || (Number.isFinite(temp) && temp <= gc.frost_below),
+      nuitDehors: gc.fx_glitch_nuit_dehors !== false,
+      vars: `--plisse:${gc.fx_glitch_plisse};--eamp:${gc.fx_glitch_echarpe_amp}px;--edur:${gc.fx_glitch_echarpe_per}s;`
+        + `--boule:${gc.fx_glitch_boule};--souffle:${gc.fx_glitch_souffle};--zs:${gc.fx_glitch_z_taille}px;`
+        + `--zdur:${gc.fx_glitch_z_periode}s;--grelot:${gc.fx_glitch_grelot}px`,
+    }) : '';
 
     // GLITCH : planqué SOUS le divider du forecast, il émerge par rafales (cf glitch-header).
     // La bande .wcatband est clippée sur le divider ; le chat (.wcat) part caché et émerge.
@@ -2432,6 +2549,28 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (etNow && !this._etOn) this._etPass(900);
     if (!etNow) this._etStop();
     this._etOn = etNow;
+    // Feu d'artifice : nuit d'une date de fx_feu_dates (1, fx_feu_couleurs) ou du 31/12 (2, or).
+    // Le 31/12 est aussi une nuit de decembre : le traineau passe d'abord, la salve
+    // suit, et le tap sur la lune lance le feu.
+    const ft = this._config.fx_feu_toujours;
+    const md = String(eM).padStart(2, '0') + '-' + String(eD).padStart(2, '0');
+    // "7/4" ou "07-04" : jour et mois normalises sur 2 chiffres avant comparaison.
+    const fete = String(this._config.fx_feu_dates || '').split(/[,;\s]+/).some(t =>
+      t && t.split(/[-/.]/).map(x => x.padStart(2, '0')).join('-') === md);
+    const feuNow = !this._config.fx_feu ? 0
+      : ft ? (ft === 'nouvel_an' ? 2 : 1)
+      : !nightNow ? 0 : fete ? 1 : (eM === 12 && eD === 31) ? 2 : 0;
+    if (feuNow && feuNow !== this._feuOn)
+      this._feuSalve(noelNow ? 900 + this._config.fx_noel_duree * 1000 : 900, feuNow);
+    if (!feuNow) this._feuStop();
+    this._feuOn = feuNow;
+    // Poisson d'avril : date du jour reelle (pas celle du soir), de jour comme de nuit.
+    const today = new Date();
+    const avrilNow = !!this._config.fx_avril && (this._config.fx_avril_toujours ||
+      (today.getMonth() === 3 && today.getDate() === 1));
+    if (avrilNow && !this._avrilOn) this._avrilPrank(1200);
+    if (!avrilNow) this._avrilStop();
+    this._avrilOn = avrilNow;
 
     // particules CSS (pluie légère/neige/annonces/rayons/étoiles).
     if (this._config.particles) {
@@ -2529,20 +2668,32 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const cat = this._elInner.querySelector('.wcat');
     if (!cat) return;
 
-    const DOS = ['wcat-do-nod', 'wcat-do-wink', 'wcat-do-vib'];  // brique pendant le pic
-    const pop = () => {
-      if (this.classList.contains('w-narrow') || document.hidden) { schedule(); return; }
+    const pop = (once) => {
+      if (this.classList.contains('w-narrow') || document.hidden) { if (!once) schedule(); return; }
+      if (cat.classList.contains('wcat-pop')) { if (!once) schedule(); return; }
+      // brique pendant le pic : aucune en dormant, pas de wink quand les yeux sont plissés
+      const DOS = cat.classList.contains('wcat-sleep') ? ['']
+        : cat.classList.contains('wcat-fog') ? ['wcat-do-nod', 'wcat-do-vib']
+        : ['wcat-do-nod', 'wcat-do-wink', 'wcat-do-vib'];
       const dur = 2600 + Math.random() * 800;                    // durée du pop : 2.6–3.4 s
       const doCls = DOS[Math.floor(Math.random() * DOS.length)];
-      const x = 4 + Math.random() * 80;                          // X aléatoire : 4–84% du divider
-      cat.style.setProperty('--pop-x', x.toFixed(1) + '%');
-      cat.style.setProperty('--pop-dur', dur + 'ms');
-      cat.classList.add('wcat-pop', doCls);
-      setTimeout(() => cat.classList.remove('wcat-pop', doCls), dur + 60);
-      schedule();
+      if (!cat.classList.contains('wcat-out')) {
+        const x = 4 + Math.random() * 80;                        // X aléatoire : 4–84% du divider
+        cat.style.setProperty('--pop-x', x.toFixed(1) + '%');
+        cat.style.setProperty('--pop-dur', dur + 'ms');
+        cat.classList.add('wcat-pop');
+      }
+      if (doCls) cat.classList.add(doCls);
+      setTimeout(() => { cat.classList.remove('wcat-pop'); if (doCls) cat.classList.remove(doCls); }, dur + 60);
+      if (!once) schedule();
     };
+    this._glitchPop = () => pop(true);
     const schedule = () => {
-      const delay = 9000 + Math.random() * 14000;  // 9–23 s entre deux apparitions (discret)
+      const c = this._config;
+      const lo = Math.min(c.fx_glitch_sortie_min, c.fx_glitch_sortie_max);
+      const hi = Math.max(c.fx_glitch_sortie_min, c.fx_glitch_sortie_max);
+      const delay = this._glitchActive ? (lo + Math.random() * (hi - lo)) * 1000
+                                       : 9000 + Math.random() * 14000;  // 9–23 s par temps calme
       this._glitchTimer = setTimeout(pop, delay);
     };
     schedule();
@@ -4452,6 +4603,143 @@ void main(){
     if (this._noelAnim) { for (const a of this._noelAnim) a.cancel(); this._noelAnim = null; }
   }
 
+  // Une salve de feu d'artifice (mode 1 = tricolore, 2 = Nouvel An), simulation du
+  // banc a pas fixe 1/60 s. Boucle RAF tant qu'il reste une fusee ou une etincelle.
+  _feuSalve(delay, mode) {
+    const cv = this._elFeu;
+    if (!cv || !cv.getContext) return;
+    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    clearTimeout(this._feuTimer);
+    this._feuTimer = setTimeout(() => {
+      this._feuTimer = null;
+      const W = cv.offsetWidth, H = cv.offsetHeight;
+      if (!W || !H) return;
+      const c = this._config, dpr = WNC_IS_LOW_POWER ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      const ctx = cv.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const pal = mode === 2
+        ? ['#ffc933', '#ffe9a8', '#ffc933', '#ff3df0', '#33e1ff', '#7dff5a']
+        : (String(c.fx_feu_couleurs || '').match(/#[0-9a-f]{3,8}\b/gi) || ['#2f6bff', '#f4f7ff', '#ff2a3a']);
+      const Hs = Math.min(H, 240), n = Math.max(1, Math.round(c.fx_feu_fusees));
+      const plan = [], rk = [], pt = [];
+      for (let k = 0; k < n; k++) plan.push({
+        at: n === 1 ? 0 : k / (n - 1) * c.fx_feu_duree * (0.85 + 0.15 * Math.random()),
+        x: W * (0.12 + 0.76 * Math.random()),
+        y: Hs * (c.fx_feu_hauteur + (Math.random() - 0.5) * 0.22), ci: Math.floor(Math.random() * 99) });
+      plan.sort((a, b) => a.at - b.at);
+      const DT = 1 / 60, drag = Math.exp(-2.6 * DT);
+      let t = 0;
+      const step = () => {
+        t += DT;
+        while (plan.length && plan[0].at <= t) {
+          const p = plan.shift();
+          rk.push({ x: p.x + (Math.random() - 0.5) * 30, y: H + 4, tx: p.x, ty: p.y, age: 0, ci: p.ci });
+        }
+        for (let i = rk.length - 1; i >= 0; i--) {
+          const k = rk[i];
+          k.age += DT;
+          const u = Math.min(k.age / 0.9, 1), e = 1 - (1 - u) * (1 - u);
+          k.px = k.cx; k.py = k.cy;
+          k.cx = k.x + (k.tx - k.x) * e; k.cy = k.y + (k.ty - k.y) * e;
+          if (u < 1) continue;
+          rk.splice(i, 1);
+          const base = pal[k.ci % pal.length], m = Math.round(c.fx_feu_particules);
+          for (let j = 0; j < m; j++) {
+            const a = Math.random() * 6.2832, sp = c.fx_feu_rayon * 2.6 * (Math.sqrt(Math.random()) * 0.6 + 0.4);
+            pt.push({ x: k.tx, y: k.ty, px: k.tx, py: k.ty, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, age: 0,
+              vie: c.fx_feu_vie * (0.75 + 0.5 * Math.random()), f: Math.random() * 6.28,
+              c: Math.random() < c.fx_feu_melange ? pal[Math.floor(Math.random() * pal.length)] : base });
+          }
+        }
+        for (let i = pt.length - 1; i >= 0; i--) {
+          const p = pt[i];
+          p.age += DT;
+          if (p.age >= p.vie) { pt.splice(i, 1); continue; }
+          p.px = p.x; p.py = p.y;
+          p.vx *= drag; p.vy = p.vy * drag + c.fx_feu_gravite * DT;
+          p.x += p.vx * DT; p.y += p.vy * DT;
+        }
+      };
+      // traine = effacement partiel de ce qui est deja peint (canvas transparent sur le ciel)
+      const draw = () => {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = 'rgba(0,0,0,' + (1 - c.fx_feu_trainee).toFixed(3) + ')';
+        ctx.fillRect(0, 0, W, H);
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.lineCap = 'round';
+        if (c.fx_feu_fusee > 0) for (const k of rk) {
+          if (k.px == null) continue;
+          ctx.globalAlpha = 0.9 * c.fx_feu_fusee; ctx.strokeStyle = '#ffdcaa'; ctx.lineWidth = 1.2;
+          ctx.beginPath(); ctx.moveTo(k.px, k.py); ctx.lineTo(k.cx, k.cy); ctx.stroke();
+        }
+        for (const p of pt) {
+          const u = p.age / p.vie;
+          let a = 1 - u * u;
+          if (c.fx_feu_crepite > 0 && u > 0.5) a *= 1 - c.fx_feu_crepite * (0.5 + 0.5 * Math.sin(p.age * 38 + p.f));
+          if (a <= 0.01) continue;
+          if (c.fx_feu_eclat > 0) {
+            ctx.globalAlpha = a * 0.22 * Math.min(c.fx_feu_eclat, 1.5); ctx.fillStyle = p.c;
+            ctx.beginPath(); ctx.arc(p.x, p.y, 1.2 + 2.6 * c.fx_feu_eclat, 0, 6.2832); ctx.fill();
+          }
+          ctx.globalAlpha = a; ctx.strokeStyle = p.c; ctx.lineWidth = 1.4;
+          ctx.beginPath(); ctx.moveTo(p.px, p.py); ctx.lineTo(p.x + 0.01, p.y); ctx.stroke();
+        }
+        ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+      };
+      this._feuStop(true);
+      ctx.clearRect(0, 0, W, H);
+      let last = performance.now();
+      const tick = now => {
+        let k = Math.min(Math.round((now - last) / (DT * 1000)), 4);
+        if (k > 0) last = now;
+        while (k-- > 0) { step(); draw(); }
+        if (plan.length || rk.length || pt.length) this._feuRAF = requestAnimationFrame(tick);
+        else { this._feuRAF = null; ctx.clearRect(0, 0, W, H); }
+      };
+      this._feuRAF = requestAnimationFrame(tick);
+    }, delay || 0);
+  }
+
+  _feuStop(keepTimer) {
+    if (!keepTimer) { clearTimeout(this._feuTimer); this._feuTimer = null; }
+    if (this._feuRAF) { cancelAnimationFrame(this._feuRAF); this._feuRAF = null; }
+    const cv = this._elFeu;
+    if (cv && cv.width) cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+  }
+
+  // Poisson d'avril : condition et temperature absurdes 3 s, puis l'aveu, puis le vrai.
+  // On ne restaure que si le render n'a pas deja reecrit les elements entre-temps.
+  _avrilPrank(delay) {
+    clearTimeout(this._avrilTimer);
+    this._avrilTimer = setTimeout(() => {
+      const cond = this._elInner && this._elInner.querySelector('.wcond');
+      const temp = this._elInner && this._elInner.querySelector('.wtemp');
+      if (!cond || !temp) { this._avrilTimer = null; return; }
+      const FAUX = ['Pluie de grenouilles', 'Averses de confettis', 'Brouillard de guimauve',
+        'Neige au chocolat', 'Tornade de chats', 'Grêle de croquettes'];
+      const DEG = ['451', '-273', '9000', '42', '3,14'];
+      const c0 = cond.textContent, t0 = temp.innerHTML, d0 = temp.getAttribute('data-t');
+      const unit = (temp.querySelector('small') || {}).textContent || '°';
+      const deg = DEG[Math.floor(Math.random() * DEG.length)];
+      cond.textContent = _t(FAUX[Math.floor(Math.random() * FAUX.length)]);
+      temp.innerHTML = deg + '<small>' + unit + '</small>';
+      temp.setAttribute('data-t', deg + unit);
+      const fake = cond.textContent;
+      this._avrilTimer = setTimeout(() => {
+        if (cond.isConnected && cond.textContent === fake) cond.textContent = _t("Poisson d'avril !") + ' 🐟';
+        this._avrilTimer = setTimeout(() => {
+          this._avrilTimer = null;
+          if (!cond.isConnected) return;
+          cond.textContent = c0; temp.innerHTML = t0;
+          if (d0 != null) temp.setAttribute('data-t', d0);
+        }, 1400);
+      }, 3000);
+    }, delay || 0);
+  }
+
+  _avrilStop() { clearTimeout(this._avrilTimer); this._avrilTimer = null; }
+
   _aurMoonLit() { return (1 - Math.cos(moonPhase() * 2 * Math.PI)) / 2; }
 
   _aurInit() {
@@ -4849,6 +5137,7 @@ WeatherNeonCardWebgl.styles = `
   :host([moongl]) .wmoongl { display:block; }
   /* E.T. : au-dessus de la lune (meme z-index, plus loin dans le DOM), invisible au
      repos -- seule l'animation one-shot le fait apparaitre (fill:none au retour). */
+  .wfeu { position:absolute; inset:0; width:100%; height:100%; z-index:1; pointer-events:none; }
   .wnoel { position:absolute; left:0; top:0; z-index:1; overflow:visible; opacity:0;
            transform-origin:50% 50%; pointer-events:none; }
   .wnoel g { transform-origin:0 0; }
@@ -4998,6 +5287,27 @@ WeatherNeonCardWebgl.styles = `
   .wcat-do-wink .wcat-lid { animation:wcatwink .42s ease-in-out .6s; }
   .wcat-do-vib  .wcat-m { animation:wcatvib .4s steps(2) 3; }
   .wcat-lid { transform-box:fill-box; transform-origin:center top; transform:scaleY(0); }
+  .wcat.wcat-out { transform:translateY(0); }
+  .wcat svg { overflow:visible; }
+  .wcat-lidl { transform-box:fill-box; transform-origin:center top; transform:scaleY(0); }
+  .wcat-lid, .wcat-lidl { transition:transform .08s linear; }
+  .wcat-fog .wcat-lid, .wcat-fog .wcat-lidl { transform:scaleY(var(--plisse,.55)); }
+  .wcat-sleep .wcat-lid, .wcat-sleep .wcat-lidl,
+  .wcat-blink .wcat-lid, .wcat-blink .wcat-lidl { transform:scaleY(1); animation:none; }
+  .wcat-scarf rect { animation:wcatscarf var(--edur,.6s) steps(2) infinite; }
+  .wcat-scarf rect:nth-child(2) { animation-delay:calc(var(--edur,.6s) * -.33); }
+  .wcat-scarf rect:nth-child(3) { animation-delay:calc(var(--edur,.6s) * -.66); }
+  @keyframes wcatscarf { 0%,100%{transform:translateY(calc(var(--eamp,2.5px) * -.5))} 50%{transform:translateY(calc(var(--eamp,2.5px) * .5))} }
+  .wcat-sleep svg { transform-origin:50% 82%; animation:wcatbreathe 3.2s ease-in-out infinite; }
+  .wcat-sleep .wcat-r { animation:wcatr 2.8s steps(2) infinite, wcatbreathe 3.2s ease-in-out infinite; }
+  .wcat-sleep .wcat-c { animation:wcatc 2.8s steps(2) infinite, wcatbreathe 3.2s ease-in-out infinite; }
+  @keyframes wcatbreathe { 0%,100%{ scale:1.04 var(--boule,.85); }
+    50%{ scale:1 calc(var(--boule,.85) + var(--souffle,.04)); } }
+  .wcat-z text { font:700 var(--zs,8px) monospace; opacity:0; animation:wcatz var(--zdur,2.6s) linear infinite; }
+  .wcat-z text:nth-child(2) { animation-delay:calc(var(--zdur,2.6s) * -.33); }
+  .wcat-z text:nth-child(3) { animation-delay:calc(var(--zdur,2.6s) * -.66); }
+  @keyframes wcatz { 0%{opacity:0; transform:translate(0,0)} 15%{opacity:1}
+    100%{opacity:0; transform:translate(7px,-14px)} }
 
   @keyframes wdrift { 0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)} }
   @keyframes wrain { to { transform:translateY(260px); } }
@@ -5014,7 +5324,9 @@ WeatherNeonCardWebgl.styles = `
   @keyframes wtglitch { 0%,92%,100%{transform:translate(0)} 93%{transform:translate(-2px,1px)} 95%{transform:translate(2px,-1px)} 97%{transform:translate(-1px,0)} }
   @keyframes wcatr { 0%,80%{transform:translate(0)} 85%{transform:translate(-4px,1px)} 91%{transform:translate(3px,-1px)} 97%{transform:translate(-2px,0)} }
   @keyframes wcatc { 0%,80%{transform:translate(0)} 85%{transform:translate(4px,-1px)} 91%{transform:translate(-3px,1px)} 97%{transform:translate(2px,0)} }
-  @keyframes wcatshiver { 0%,100%{transform:translate(0)} 25%{transform:translate(-1.2px,0)} 75%{transform:translate(1.2px,.4px)} }
+  /* propriété translate (et non transform) : se compose avec le translateY du pop, sinon
+     le grelottement écrase la position cachée et GLITCH reste sorti en permanence */
+  @keyframes wcatshiver { 0%,100%{translate:0 0} 25%{translate:calc(var(--grelot,1.2px) * -1) 0} 75%{translate:var(--grelot,1.2px) .4px} }
   @keyframes wcatnod { 0%,100%{transform:translateY(0)} 30%{transform:translateY(4px)} 60%{transform:translateY(0)} 80%{transform:translateY(2px)} }
   @keyframes wcatvib { 0%,100%{transform:translate(0)} 50%{transform:translate(1.2px,-.6px)} }
   /* wink : la paupière descend (0→1, ferme l'œil) puis remonte (1→0, rouvre) */
@@ -5729,6 +6041,24 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._toggle('fx_gl', 'Post-process WebGL (pluie/givre/chaleur/neige)', true);
     });
 
+    this._group('GLITCH le chat 🐱', false, () => {
+      this._hint("GLITCH réagit à la météo : plisse les yeux au brouillard, écharpe au-delà du seuil de vent, dort en boule la nuit claire, grelotte au gel, ferme les yeux aux éclairs. Par pluie, orage ou neige, il sort plus souvent.");
+      this._number('fx_glitch_plisse', 'Brouillard : yeux plissés (0-1)', { min: 0, max: 1, step: 0.05, ph: '0.55' });
+      this._number('fx_glitch_vent_seuil', "Vent : seuil de l'écharpe (km/h)", { min: 0, max: 150, step: 1, ph: '35' });
+      this._number('fx_glitch_echarpe_amp', 'Écharpe : amplitude', { min: 0, max: 6, step: 0.1, ph: '2.5' });
+      this._number('fx_glitch_echarpe_per', 'Écharpe : période (s)', { min: 0.2, max: 2, step: 0.05, ph: '0.6' });
+      this._toggle('fx_glitch_nuit_dehors', 'Nuit : dort dehors', true);
+      this._number('fx_glitch_boule', 'Nuit : en boule', { min: 0.6, max: 1, step: 0.01, ph: '0.85' });
+      this._number('fx_glitch_souffle', 'Nuit : respiration', { min: 0, max: 0.12, step: 0.005, ph: '0.04' });
+      this._number('fx_glitch_z_taille', 'Nuit : taille des z', { min: 4, max: 16, step: 0.5, ph: '8' });
+      this._number('fx_glitch_z_periode', "Nuit : montée d'un z (s)", { min: 1, max: 6, step: 0.1, ph: '2.6' });
+      this._number('fx_glitch_grelot', 'Gel : grelottement (px)', { min: 0, max: 4, step: 0.1, ph: '1.2' });
+      this._number('fx_glitch_clin_delai', "Éclair : délai du clin d'œil (ms)", { min: 0, max: 800, step: 10, ph: '120' });
+      this._number('fx_glitch_clin_duree', 'Éclair : yeux fermés (ms)', { min: 100, max: 1500, step: 10, ph: '450' });
+      this._number('fx_glitch_sortie_min', 'Météo active : sortie min (s)', { min: 1, max: 15, step: 0.5, ph: '4' });
+      this._number('fx_glitch_sortie_max', 'Météo active : sortie max (s)', { min: 2, max: 25, step: 0.5, ph: '8' });
+    });
+
     this._group('Ciel WebGL', false, () => {
       this._toggle('sky', 'Couche ciel WebGL', true);
       this._hint('sky_* : opacite/couverture/saturation/brume/profondeur = GAINS (1.00 = neutre), pas des absolus.');
@@ -5930,6 +6260,32 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._number('fx_noel_galop', 'Galop des rennes', { min: 0, max: 1.5, step: 0.05, ph: '0.80' });
       this._number('fx_noel_houle', "Tangage de l'attelage", { min: 0, max: 1, step: 0.05, ph: '1.00' });
       this._number('fx_noel_nez', 'Nez de Rudolph (0 = ombre pure)', { min: 0, max: 1, step: 0.05, ph: '1.00' });
+    });
+
+    this._group("Feu d'artifice (easter egg)", false, () => {
+      this._hint("La nuit des dates de fête (MM-JJ, plusieurs séparées par des virgules, 07-14 par défaut) aux couleurs choisies, et du Nouvel An (or) : une salve à l'affichage puis à chaque tap sur la lune. Le 31/12, le traîneau passe d'abord. fx_feu_toujours = mode démo (true ou 'nouvel_an'), jamais en prod.");
+      this._toggle('fx_feu', 'Activer', true);
+      this._toggle('fx_feu_toujours', 'Toujours actif (démo)', false);
+      this._text('fx_feu_dates', 'Dates de fête (MM-JJ)', '07-14');
+      this._text('fx_feu_couleurs', 'Couleurs de la fête', '#2f6bff,#f4f7ff,#ff2a3a');
+      this._number('fx_feu_fusees', 'Fusées par salve', { min: 1, max: 16, step: 1, ph: '6' });
+      this._number('fx_feu_duree', 'Durée de la salve (s)', { min: 1, max: 12, step: 0.1, ph: '3.0' });
+      this._number('fx_feu_particules', 'Particules par gerbe', { min: 12, max: 160, step: 1, ph: '100' });
+      this._number('fx_feu_rayon', 'Rayon de la gerbe (px)', { min: 15, max: 120, step: 1, ph: '75' });
+      this._number('fx_feu_hauteur', 'Hauteur des éclatements', { min: 0.1, max: 0.8, step: 0.01, ph: '0.20' });
+      this._number('fx_feu_gravite', 'Gravité', { min: 0, max: 200, step: 1, ph: '55' });
+      this._number('fx_feu_vie', "Vie d'une étincelle (s)", { min: 0.4, max: 3.5, step: 0.05, ph: '2.50' });
+      this._number('fx_feu_trainee', 'Traînée', { min: 0, max: 0.97, step: 0.01, ph: '0.80' });
+      this._number('fx_feu_eclat', 'Halo', { min: 0, max: 2, step: 0.05, ph: '1.00' });
+      this._number('fx_feu_melange', 'Mélange des couleurs', { min: 0, max: 1, step: 0.05, ph: '0.50' });
+      this._number('fx_feu_crepite', 'Crépitement', { min: 0, max: 1, step: 0.05, ph: '0.85' });
+      this._number('fx_feu_fusee', 'Trace de la fusée', { min: 0, max: 1, step: 0.05, ph: '0.60' });
+    });
+
+    this._group("Poisson d'avril (easter egg)", false, () => {
+      this._hint("Le 1er avril, une météo absurde s'affiche 3 s, puis l'aveu. fx_avril_toujours = mode démo, jamais en prod.");
+      this._toggle('fx_avril', 'Activer', true);
+      this._toggle('fx_avril_toujours', 'Toujours actif (démo)', false);
     });
 
     this._group("Transverses (cumuls d'effets)", false, () => {

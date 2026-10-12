@@ -34,6 +34,9 @@ Three more come back on fixed dates, at night only (a night counts as the date o
 
 To see them on any day: `fx_lune_rouge_toujours: true`, `fx_lune_etoile_toujours: true` (wins over the red moon if both are on) or `fx_noel_toujours: true` (demo modes, not meant to stay on). `fx_lune_dates: false` turns the date triggers off.
 
+- **Fireworks on your holiday nights**: on each date of `fx_feu_dates` (default `07-14`, comma-separated, e.g. `07-04,11-05`) the night sky gets a fireworks show in `fx_feu_couleurs`. On December 31 it is gold, after Santa's sleigh has passed; tap the moon for another salvo. Demo: `fx_feu_toujours: true`.
+- **April 1st**: the card shows an absurd forecast for three seconds, then owns up with "April fool! 🐟". Demo: `fx_avril_toujours: true`.
+
 <img src="https://raw.githubusercontent.com/cerealkiller57540/weather-neon-card/main/images/death-star.jpg" alt="The moon replaced by the Death Star above a clear night sky" width="520">
 
 ## ✨ Features
@@ -43,7 +46,7 @@ To see them on any day: `fx_lune_rouge_toujours: true`, `fx_lune_etoile_toujours
 - **Forecast tiles**, daily or hourly, through `weather.get_forecasts`, with a min/max bar coloured by temperature.
 - **Day and night from the sun**, not from the provider's fixed time slots, optionally refined by a light sensor (`lux_entity`).
 - **Weather warnings** (`alert_entity`, e.g. a Météo-France vigilance sensor) and **Atmo France** air-quality and pollen badges.
-- **Glitch the cat** pops out of the forecast divider from time to time.
+- **Glitch the cat** pops out of the forecast divider from time to time, and reacts to the weather: sunglasses in the sun, umbrella in the rain, squinting in fog, a scarf in strong wind, curled up asleep on clear nights, shivering in frost, eyes shut at every lightning flash. He comes out more often when the weather is busy.
 - **Visual editor** with grouped sections; every effect has its own slider and a "force visible" switch to tune it in any weather.
 - **One WebGL context** shared by every layer and every instance, kept alive when you change views: it stays well under the 8-context limit of Android WebViews. Pauses when off-screen, falls back to canvas rendering without WebGL, and scales the whole block down on narrow columns instead of squeezing it.
 
@@ -124,6 +127,10 @@ pollen_entity: sensor.atmo_france_qualite_globale_pollen_<zone>
 | `fx_lune_dates` | `true` | Fixed-date moon easter eggs (Oct 31 and Friday the 13th: red moon; May 4: battle station) |
 | `fx_lune_rouge_toujours` / `fx_lune_etoile_toujours` | `false` / `false` | Blood-red moon with skull / battle-station moon, demo switches (tune them in the editor's moon easter egg group) |
 | `fx_noel` / `fx_noel_toujours` | `true` / `false` | December sleigh easter egg / demo mode (size, reindeer count, path, gallop and Rudolph's nose in the editor) |
+| `fx_feu` / `fx_feu_toujours` | `true` / `false` | Fireworks easter egg / demo mode |
+| `fx_feu_dates` / `fx_feu_couleurs` | `07-14` / `#2f6bff,#f4f7ff,#ff2a3a` | Holiday dates (MM-DD, comma-separated) / fireworks palette; Dec 31 is always on, in gold |
+| `fx_avril` / `fx_avril_toujours` | `true` / `false` | April fool easter egg / demo mode |
+| `fx_glitch_*` | | Glitch's weather reactions: squint, wind threshold for the scarf (`fx_glitch_vent_seuil`, 35 km/h), sleep, shiver, lightning blink, how often he comes out (all in the editor's Glitch group) |
 | `largeur_ref` | `380` | Width the card is drawn at; narrower columns scale the whole block |
 | `show_clock` | `false` | Time banner at the top of the card (the card grows by about 18 px) |
 | `clock_align` / `clock_size` | `center` / `18` | `center` or `left`; time size in px |
