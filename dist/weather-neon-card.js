@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.10.1
+ * weather-neon-card v3.10.2
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.10.1';
+const VERSION = '3.10.2';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -652,9 +652,9 @@ function atmoPastille(hass, iconKey, entityId, nextEntityId) {
     }
   }
 
-  return `<span class="watmo" data-atmo="${entityId}" style="color:${color}">`
+  return `<span class="watmo" data-atmo="${escHtml(entityId)}" style="color:${safeCssColor(color)}">`
        + `<span class="watmo-i">${MINI_ICONS[iconKey]}</span>`
-       + `<b>${label}</b>${trend}</span>`;
+       + `<b>${escHtml(label)}</b>${trend}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1026,14 +1026,18 @@ const SKY = {
 };
 
 // Labels FR des conditions
-// Échappement HTML pour toute chaîne venant de HA (états, attributs, `name`) injectée
-// dans un template `innerHTML`. Le nom d'une entité ou un libellé fournisseur n'est PAS
-// du HTML de confiance : un `<` suffit à casser le rendu, et pire dans le cas général.
-// (Chantier plus large repoussé — vigilance/Atmo passent encore en brut ; ce helper est
-// le point de départ pour les reprendre.)
+// Échappement HTML de toute chaîne issue de HA (état, attribut, `name`, id d'entité)
+// avant injection dans un template `innerHTML` : ce n'est pas du HTML de confiance.
 function escHtml(v) {
   return String(v ?? '').replace(/[&<>"']/g, c => (
     { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+// Couleur issue d'un attribut HA, injectée dans `style="color:…"` : liste blanche (hex,
+// rgb/hsl, mot-clé) pour interdire toute déclaration CSS supplémentaire.
+function safeCssColor(v) {
+  const s = String(v ?? '').trim();
+  return /^(#[0-9a-f]{3,8}|[a-z]{3,20}|(?:rgb|hsl)a?\([\d\s.,%/-]{1,40}\))$/i.test(s) ? s : 'currentColor';
 }
 
 const COND_FR = {
@@ -2256,7 +2260,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // decide, et il repasse a chaque _render.
 
     const st = this._hass.states[this._config.entity];
-    if (!st) { this._elInner.innerHTML = `<div style="padding:16px">${_t('Entité introuvable :')} ${this._config.entity}</div>`; return; }
+    if (!st) { this._elInner.innerHTML = `<div style="padding:16px">${_t('Entité introuvable :')} ${escHtml(this._config.entity)}</div>`; return; }
 
     // Dirty-check : HA pousse `set hass` plusieurs fois/seconde. On ne re-render que
     // si un état PERTINENT a changé (sinon : centaines de recalculs/RAF inutiles =
@@ -2295,7 +2299,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const name = this._config.name || cleanLocationName(a.friendly_name) || this._config.entity;
     const showName = this._config.show_name !== false;
     const temp = Math.round(a.temperature);
-    const unit = a.temperature_unit || '°C';
+    const unit = escHtml(a.temperature_unit || '°C');
 
     // ACCENT PAR MÉTÉO : --wnc-acc sur ha-card ; sans l'option → retombe sur le thème
     const acc = this._config.mood_accent ? (ACCENT[cond] || null) : null;
@@ -2351,7 +2355,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
     // stats secondaires — en pastilles (même style que les pastilles Atmo, pour l'homogénéité).
     const statPill = (iconKey, v) => v == null ? '' :
-      `<span class="watmo watmo-stat"><span class="watmo-i">${MINI_ICONS[iconKey]}</span><b>${v}</b></span>`;
+      `<span class="watmo watmo-stat"><span class="watmo-i">${MINI_ICONS[iconKey]}</span><b>${escHtml(v)}</b></span>`;
     const pUnit = a.pressure_unit || 'hPa';
     const windVal = ex.wind != null ? ex.wind : a.wind_speed;  // sensor externe prioritaire
     const c = this._config;
@@ -2437,7 +2441,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
         <div class="wnow">
           <div class="wcond">${escHtml(condLabel)}</div>
           ${vigi ? `<div class="wvigi" style="color:${vigi.color}">⚠ ${_t('Vigilance')} ${_t(Object.keys(VIGI_RANK)[vigi.rank])} — ${vigi.risks.map(r => _t(r)).join(', ')}</div>` : ''}
-          ${showName ? `<div class="wloc">${name}</div>` : ''}
+          ${showName ? `<div class="wloc">${escHtml(name)}</div>` : ''}
         </div>
         ${asideHtml}
       </div>
@@ -4719,11 +4723,14 @@ void main(){
       const FAUX = ['Pluie de grenouilles', 'Averses de confettis', 'Brouillard de guimauve',
         'Neige au chocolat', 'Tornade de chats', 'Grêle de croquettes'];
       const DEG = ['451', '-273', '9000', '42', '3,14'];
-      const c0 = cond.textContent, t0 = temp.innerHTML, d0 = temp.getAttribute('data-t');
+      const c0 = cond.textContent, d0 = temp.getAttribute('data-t');
+      const t0 = Array.from(temp.childNodes, n => n.cloneNode(true));
       const unit = (temp.querySelector('small') || {}).textContent || '°';
       const deg = DEG[Math.floor(Math.random() * DEG.length)];
       cond.textContent = _t(FAUX[Math.floor(Math.random() * FAUX.length)]);
-      temp.innerHTML = deg + '<small>' + unit + '</small>';
+      const sm = document.createElement('small');
+      sm.textContent = unit;
+      temp.replaceChildren(document.createTextNode(deg), sm);
       temp.setAttribute('data-t', deg + unit);
       const fake = cond.textContent;
       this._avrilTimer = setTimeout(() => {
@@ -4731,7 +4738,7 @@ void main(){
         this._avrilTimer = setTimeout(() => {
           this._avrilTimer = null;
           if (!cond.isConnected) return;
-          cond.textContent = c0; temp.innerHTML = t0;
+          cond.textContent = c0; temp.replaceChildren(...t0);
           if (d0 != null) temp.setAttribute('data-t', d0);
         }, 1400);
       }, 3000);
