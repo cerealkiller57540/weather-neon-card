@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.10.2
+ * weather-neon-card v3.10.3
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.10.2';
+const VERSION = '3.10.3';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -5046,7 +5046,9 @@ WeatherNeonCardWebgl.styles = `
     background:color-mix(in srgb, var(--acc) 10%, transparent);
     text-shadow:0 0 8px color-mix(in srgb, var(--acc) 60%, transparent); }
   .waside { flex:none; display:flex; flex-direction:column; gap:8px; align-items:flex-end;
-    font-size:11.5px; opacity:.92; }
+    font-size:11.5px; opacity:.92;
+    /* décalé sous le disque lunaire (.wmoon / .wmoongl, ancré en haut à droite) */
+    position:relative; top:42px; }
   .war { display:flex; align-items:center; gap:6px; white-space:nowrap; }
   .war b { font-weight:600; }
   .wari { display:flex; }
