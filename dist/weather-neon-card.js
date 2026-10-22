@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.10.3
+ * weather-neon-card v3.10.4
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.10.3';
+const VERSION = '3.10.4';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -1411,7 +1411,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (!config.entity) throw new Error('weather-neon-card : "entity" est requis (weather.*)');
     this._config = buildConfig(config);
     this._forecast = null;
-    this._fcKey = null;
+    this._fcUnsub();
     this._lastHtml = null;
     this._renderSnap = null;
     // iPad/mobile : classe low-power → coupe scanline/glitch + fige les SVG animés.
@@ -1439,40 +1439,48 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._built && this._config.show_clock && !this._clockTimer) this._clockStart();
   }
 
-  // Appel du service weather.get_forecasts (HA 2024+) — caché et rafraîchi périodiquement
-  async _fetchForecast() {
+  // Prévisions via l'abonnement WS weather/subscribe_forecast (comme la card météo native) :
+  // ouvert aux comptes non-admin (execute_script exige admin) et poussé par HA à chaque mise à jour.
+  _fetchForecast() {
     if (!this._hass || !this._config?.entity) return;
     // entité absente (saisie en cours dans l'éditeur) ou type non supporté (twice_daily sur
-    // Météo-France/met.no) → HA rejette l'appel et le logue en ERROR : on ne l'émet pas
+    // Météo-France/met.no) → HA rejette l'abonnement et le logue en ERROR : on ne l'émet pas
     const st = this._hass.states[this._config.entity];
     const bit = { daily: 1, hourly: 2, twice_daily: 4 }[this._config.forecast_type];
-    // au démarrage de HA l'entité existe déjà (état « unavailable » restauré du registre, features
-    // comprises) avant que l'intégration soit chargée : l'appel échouerait pareil
+    // au démarrage de HA (ou au rechargement de l'intégration) l'entité est « unavailable » :
+    // on lâche l'abonnement, il sera rouvert sur la nouvelle instance de l'entité
     if (!st || st.state === 'unavailable' || !bit || !((st.attributes?.supported_features || 0) & bit)) {
+      this._fcUnsub();
       if (st?.attributes?.forecast) { this._forecast = st.attributes.forecast; this._render(); }
       return;
     }
+    if (!this.isConnected) return;
     const key = this._config.entity + '|' + this._config.forecast_type;
-    const now = Date.now();
-    if (this._fcKey === key && this._fcTs && now - this._fcTs < 5 * 60 * 1000) return; // 5 min
-    this._fcKey = key; this._fcTs = now;
-    try {
-      const resp = await this._hass.callWS({
-        type: 'execute_script',
-        sequence: [{
-          service: 'weather.get_forecasts',
-          data: { type: this._config.forecast_type },
-          target: { entity_id: this._config.entity },
-          response_variable: 'r',
-        }, { stop: 'done', response_variable: 'r' }],
-      });
-      const fc = resp?.response?.[this._config.entity]?.forecast;
-      if (fc) { this._forecast = fc; this._render(); }
-    } catch (e) {
+    if (this._fcKey === key) return;                       // déjà abonné (ou en cours)
+    if (this._fcFailKey === key && Date.now() - this._fcFailTs < 60 * 1000) return;
+    this._fcUnsub();
+    this._fcKey = key;
+    const sub = this._hass.connection.subscribeMessage((ev) => {
+      if (this._fcSub !== sub || !ev?.forecast) return;
+      this._forecast = ev.forecast;
+      this._fcTs = (this._fcTs || 0) + 1;                  // entre dans le dirty-check de _render
+      this._render();
+    }, { type: 'weather/subscribe_forecast', forecast_type: this._config.forecast_type, entity_id: this._config.entity });
+    this._fcSub = sub;
+    sub.catch(() => {
+      if (this._fcSub !== sub) return;
+      this._fcSub = null; this._fcKey = null;
+      this._fcFailKey = key; this._fcFailTs = Date.now();  // nouvel essai dans 1 min, pas à chaque set hass
       // certaines intégrations exposent encore forecast en attribut → fallback
-      const at = this._hass.states[this._config.entity]?.attributes?.forecast;
+      const at = this._hass?.states[this._config.entity]?.attributes?.forecast;
       if (at) { this._forecast = at; this._render(); }
-    }
+    });
+  }
+
+  _fcUnsub() {
+    const sub = this._fcSub;
+    this._fcSub = null; this._fcKey = null;
+    if (sub) sub.then((unsub) => unsub()).catch(() => {});
   }
 
   // HORLOGE : le texte est mis a jour hors _render (dont le dirty-check ignore l'heure) ;
@@ -1656,6 +1664,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
   disconnectedCallback() {
     this._skyStop();
+    this._fcUnsub();
     this._fxGlStop();
     this._moonStop();
     this._aurStop();
@@ -4945,6 +4954,7 @@ void main(){
   // Rattache : on RECONSTRUIT. Copie de l'idiome de neon-dual-thermo-card-webgl
   // (_wglGraft au connectedCallback), la seule de la famille qui n'ait jamais eu ce bug.
   connectedCallback() {
+    this._fetchForecast();
     if (!this._built || !this._config) return;   // le premier montage passe par _render()
     if (!this._ro) this._observeSize();
     if (this._config.sky && !this._gl) this._skyInit();
