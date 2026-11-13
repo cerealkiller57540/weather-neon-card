@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.10.4
+ * weather-neon-card v3.10.5
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.10.4';
+const VERSION = '3.10.5';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -4210,7 +4210,7 @@ void main(){
       hc.globalAlpha = 1;
     }
     hc.globalCompositeOperation = 'lighter';
-    hc.filter = 'blur(1.2px)'; hc.drawImage(hCv, 0, 0); hc.filter = 'none';
+    this._fxBlur(hc, hCv, 1.2);
 
     // A : gradient = ordre de pousse (blanc = gele en premier, pres des bords)
     // ⚠️ PIEGE : ctx.filter s'applique a CHAQUE stroke() -> un flou plein cadre par trait.
@@ -4228,7 +4228,7 @@ void main(){
     }
     const gCv = mk(MW, MH), gc = gCv.getContext('2d', { willReadFrequently: true });
     gc.fillStyle = '#000'; gc.fillRect(0, 0, MW, MH);
-    gc.filter = 'blur(' + (4 * SS) + 'px)'; gc.drawImage(gRaw, 0, 0); gc.filter = 'none';
+    this._fxBlur(gc, gRaw, 4 * SS);
 
     // RG : normale par Sobel sur la hauteur (kN compense la pente doublee par le SS)
     const hpx = hc.getImageData(0, 0, MW, MH).data;
@@ -4253,6 +4253,79 @@ void main(){
     mCv.getContext('2d').putImageData(outI, 0, 0);
     this._fxMixCv = mCv; this._fxMixKey = key;
     return mCv;
+  }
+
+  // ctx.filter du canvas 2D : absent de Safari/iOS. L'affectation y est muette (simple
+  // propriete expando), drawImage copie alors NET -- le givre perdait ses 3 flous :
+  // toile de fils durs partout et aucune clairiere autour des textes (rendu iPad).
+  // Test FONCTIONNEL, pas `'filter' in ctx` : la propriete peut exister sans effet.
+  _fxFilterOK() {
+    const K = this.constructor;
+    if (K._cfOK !== undefined) return K._cfOK;
+    let ok = false;
+    try {
+      const a = document.createElement('canvas'); a.width = a.height = 9;
+      const ac = a.getContext('2d'); ac.fillStyle = '#fff'; ac.fillRect(4, 4, 1, 1);
+      const b = document.createElement('canvas'); b.width = b.height = 9;
+      const bc = b.getContext('2d', { willReadFrequently: true });
+      bc.filter = 'blur(1px)'; bc.drawImage(a, 0, 0); bc.filter = 'none';
+      ok = bc.getImageData(3, 4, 1, 1).data[3] > 0;
+    } catch (e) { ok = false; }
+    return (K._cfOK = ok);
+  }
+
+  // Equivalent de `dst.filter = 'blur(sigma px)'; dst.drawImage(src, 0, 0)`, avec
+  // l'operation de composition courante de dst. Repli JS : flou gaussien approche par
+  // 3 boites (meme sigma que le blur CSS), en premultiplie, bords transparents comme
+  // le filtre CSS. Le rendu PC/Android ne passe jamais par le repli.
+  _fxBlur(dst, src, sigma) {
+    if (this._fxFilterOK()) {
+      dst.filter = 'blur(' + sigma.toFixed(2) + 'px)'; dst.drawImage(src, 0, 0); dst.filter = 'none';
+      return;
+    }
+    const W = src.width, H = src.height;
+    let id;
+    try { id = src.getContext('2d').getImageData(0, 0, W, H); }
+    catch (e) { dst.drawImage(src, 0, 0); return; }   // canvas teinte : net plutot que rien
+    const d = id.data, N = W * H;
+    const ch = [new Float32Array(N), new Float32Array(N), new Float32Array(N), new Float32Array(N)];
+    for (let i = 0; i < N; i++) {
+      const a = d[i * 4 + 3] / 255;
+      ch[0][i] = d[i * 4] * a; ch[1][i] = d[i * 4 + 1] * a; ch[2][i] = d[i * 4 + 2] * a; ch[3][i] = d[i * 4 + 3];
+    }
+    // tailles des 3 boites pour un sigma donne (approximation classique de Kovesi)
+    const n = 3, wI = Math.sqrt(12 * sigma * sigma / n + 1);
+    let wl = Math.floor(wI); if (wl % 2 === 0) wl--;
+    const m = Math.round((12 * sigma * sigma - n * wl * wl - 4 * n * wl - 3 * n) / (-4 * wl - 4));
+    const radii = [0, 1, 2].map(i => ((i < m ? wl : wl + 2) - 1) / 2);
+    const tmp = new Float32Array(N);
+    const pass = (s, t, r, horiz) => {          // boite 1D, somme glissante, hors cadre = 0
+      const L = horiz ? W : H, M = horiz ? H : W, st = horiz ? 1 : W, ln = horiz ? W : 1;
+      const inv = 1 / (2 * r + 1);
+      for (let j = 0; j < M; j++) {
+        const o = j * ln;
+        let acc = 0;
+        for (let k = 0; k <= r && k < L; k++) acc += s[o + k * st];
+        for (let k = 0; k < L; k++) {
+          t[o + k * st] = acc * inv;
+          const add = k + r + 1, rem = k - r;
+          if (add < L) acc += s[o + add * st];
+          if (rem >= 0) acc -= s[o + rem * st];
+        }
+      }
+    };
+    for (const c of ch) for (const r of radii) {
+      if (r < 1) continue;
+      pass(c, tmp, r, true); pass(tmp, c, r, false);
+    }
+    for (let i = 0; i < N; i++) {
+      const A = ch[3][i], ia = A > 0 ? 255 / A : 0;
+      d[i * 4] = ch[0][i] * ia; d[i * 4 + 1] = ch[1][i] * ia; d[i * 4 + 2] = ch[2][i] * ia; d[i * 4 + 3] = A;
+    }
+    const tc = this._fxBlurTmp || (this._fxBlurTmp = document.createElement('canvas'));
+    if (tc.width !== W || tc.height !== H) { tc.width = W; tc.height = H; }
+    tc.getContext('2d').putImageData(id, 0, 0);
+    dst.drawImage(tc, 0, 0);
   }
 
   // bruit lisse : petit canvas aleatoire re-etire en LINEAR (le lissage vient du filtrage)
@@ -4445,9 +4518,7 @@ void main(){
     x.setTransform(1, 0, 0, 1, 0, 0);
     x.globalCompositeOperation = 'source-over';
     x.fillStyle = '#000'; x.fillRect(0, 0, RW, RH);
-    x.filter = 'blur(' + halo.toFixed(1) + 'px)';
-    x.drawImage(sh, 0, 0);
-    x.filter = 'none';
+    this._fxBlur(x, sh, +halo.toFixed(1));
     // Le flou divise l encre par la surface du noyau : un glyphe fin retombe a ~0.15 et
     // ne degele plus rien. On la remonte en la re-additionnant, SANS elargir le halo.
     // /!\ 2 passes (x4) et pas 3 : a x8 le flou sature en plateau et la clairiere
