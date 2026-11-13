@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.10.5
+ * weather-neon-card v3.10.6
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.10.5';
+const VERSION = '3.10.6';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -3784,7 +3784,7 @@ void main(){
       const bx = b.getContext('2d');
       bx.setTransform(1, 0, 0, 1, 0, 0);
       bx.clearRect(0, 0, b.width, b.height);
-      bx.filter = 'blur(5px)'; bx.drawImage(tex0, 0, 0); bx.filter = 'none';
+      this._fxBlurFast(bx, tex0, 5);
       gl.activeTexture(gl.TEXTURE1);
       gl.bindTexture(gl.TEXTURE_2D, this._fxTex[1]);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, b);
@@ -4326,6 +4326,31 @@ void main(){
     if (tc.width !== W || tc.height !== H) { tc.width = W; tc.height = H; }
     tc.getContext('2d').putImageData(id, 0, 0);
     dst.drawImage(tc, 0, 0);
+  }
+
+  // Flou PAR FRAME (buee de la pluie, 15-30 fps) : le repli exact de _fxBlur serait
+  // trop lent a ce rythme. Sans ctx.filter (Safari/iOS) on reduit puis on re-etire en
+  // lissage bilineaire, fait par le GPU : noyau en tente d'ecart-type ~k/2.45, donc
+  // k ~ 2.45*sigma. Reduction en 2 etapes, sinon le bilineaire sous-echantillonne et
+  // la buee scintille.
+  _fxBlurFast(dst, src, sigma) {
+    if (this._fxFilterOK()) {
+      dst.filter = 'blur(' + sigma.toFixed(2) + 'px)'; dst.drawImage(src, 0, 0); dst.filter = 'none';
+      return;
+    }
+    const W = src.width, H = src.height, k = Math.max(2, 2.45 * sigma);
+    const k1 = Math.sqrt(k);
+    const w1 = Math.max(1, Math.round(W / k1)), h1 = Math.max(1, Math.round(H / k1));
+    const w2 = Math.max(1, Math.round(W / k)),  h2 = Math.max(1, Math.round(H / k));
+    const mk = (n) => this[n] || (this[n] = document.createElement('canvas'));
+    const a = mk('_fxBfA'), b = mk('_fxBfB');
+    if (a.width !== w1 || a.height !== h1) { a.width = w1; a.height = h1; }
+    if (b.width !== w2 || b.height !== h2) { b.width = w2; b.height = h2; }
+    const ax = a.getContext('2d'), bxx = b.getContext('2d');
+    ax.imageSmoothingEnabled = bxx.imageSmoothingEnabled = dst.imageSmoothingEnabled = true;
+    ax.clearRect(0, 0, w1, h1); ax.drawImage(src, 0, 0, w1, h1);
+    bxx.clearRect(0, 0, w2, h2); bxx.drawImage(a, 0, 0, w2, h2);
+    dst.drawImage(b, 0, 0, W, H);
   }
 
   // bruit lisse : petit canvas aleatoire re-etire en LINEAR (le lissage vient du filtrage)
