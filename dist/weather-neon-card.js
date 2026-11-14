@@ -1,5 +1,5 @@
 /**
- * weather-neon-card v3.11.0
+ * weather-neon-card v3.12.0
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
@@ -32,19 +32,42 @@
  *   frost             (true)     givre fractal quand temp ≤ frost_below
  *   frost_below       (3)        seuil °C du givre
  *   mood_accent       (true)     l'accent couleur de la card suit la condition
- *   orbitron          (false)    typo Orbitron (Google Fonts) sur temp/jours
+ *   orbitron          (false)    typo Orbitron (embarquee) sur temp/jours
+ *   respect_reduced_motion (true) suit le reglage systeme « reduire les animations »
  *   wind_entity / rain_chance_entity / snow_chance_entity   (auto-détectés sinon)
  *   show_humidity / show_wind / show_pressure (true)
  *   show_atmo         (true)     pastilles Atmo France
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.11.0';
+const VERSION = '3.12.0';
+
+/* Polices embarquees (woff2 latin, licence OFL 1.1, texte dans NOTICE.md du depot) : aucune requete vers Google Fonts.
+ * Orbitron (c) 2018 The Orbitron Project Authors, SIL OFL 1.1 */
+if (!document.getElementById('neon-font-orbitron')) {
+  const s = document.createElement('style');
+  s.id = 'neon-font-orbitron';
+  s.textContent = "@font-face{font-family:'Orbitron';font-style:normal;font-weight:400 900;font-display:swap;src:url(data:font/woff2;base64,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) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}";
+  document.head.appendChild(s);
+}
+
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
   (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const WNC_IS_LOW_POWER = WNC_IS_IPAD || /iPhone|iPad|iPod|Android|Mobile|HomeAssistant/i.test(navigator.userAgent);
+
+// Reglage systeme « reduire les animations » : un seul MediaQueryList pour toutes les
+// instances, lu via _rm() (jamais de matchMedia ailleurs).
+const WNC_RM_MQ = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+const _wncRmListen = (fn) => {
+  if (!WNC_RM_MQ) return;
+  if (WNC_RM_MQ.addEventListener) WNC_RM_MQ.addEventListener('change', fn); else WNC_RM_MQ.addListener(fn);
+};
+const _wncRmUnlisten = (fn) => {
+  if (!WNC_RM_MQ) return;
+  if (WNC_RM_MQ.removeEventListener) WNC_RM_MQ.removeEventListener('change', fn); else WNC_RM_MQ.removeListener(fn);
+};
 
 // ═══════════════════════════════════════════════════════
 //  CONTEXTE WEBGL UNIQUE (v3.2.0)
@@ -229,6 +252,9 @@ const _n = (v, d) => {
   return Number.isFinite(x) ? x : d;
 };
 
+// Comme _n, mais un negatif retombe sur le defaut (un compte ne peut pas etre < 0).
+const _nPos = (v, d) => { const x = _n(v, d); return x >= 0 ? x : d; };
+
 function buildConfig(raw) {
   return {
     entity:        raw.entity        || null,
@@ -288,7 +314,7 @@ function buildConfig(raw) {
     fx_antibrouillard: _n(raw.fx_antibrouillard, 0.70),
     // nappes billboards du brouillard -- fogx_level pilote le maitre-volume (voile plat ET billboards)
     fogx_level:      _n(raw.fogx_level,      0.80),
-    fogx_count:      _n(raw.fogx_count,      150),
+    fogx_count:      _nPos(raw.fogx_count,   150),   // 0 = aucune nappe
     fogx_size:       _n(raw.fogx_size,       1.30),
     fogx_opacity:    _n(raw.fogx_opacity,    0.09),
     fogx_speed:      _n(raw.fogx_speed,      0.70),
@@ -531,7 +557,8 @@ function buildConfig(raw) {
     frost_below:   _n(raw.frost_below, 3),     // seuil °C de déclenchement du givre
     neon_fx:       raw.neon_fx       ?? true,  // scanlines + temp glitchée (Neo Tokyo)
     mood_accent:   raw.mood_accent   ?? true,  // accent couleur de la card = condition météo
-    orbitron:      raw.orbitron      ?? false, // typo Orbitron (Google Fonts) temp/jours
+    orbitron:      raw.orbitron      ?? false, // typo Orbitron (embarquee) temp/jours
+    respect_reduced_motion: raw.respect_reduced_motion ?? true,  // suit prefers-reduced-motion du systeme
     // sensors externes (Météo-France expose vent/probas séparément de l'entité weather).
     // Si non fournis → auto-détectés depuis le préfixe de l'entité (cf _extra()).
     wind_entity:   raw.wind_entity   || null,  // ex: sensor.<x>_wind_speed
@@ -1299,6 +1326,8 @@ const _EN = {
  "Relief": "Relief",
  "Relief (doublure argentée)": "Relief (silver lining)",
  "Relief cratères": "Crater relief",
+ "Lune : relancer l'animation": "Moon: replay the animation",
+ "Respecter le réglage système « réduire les animations »": "Respect the system \"reduce motion\" setting",
  "Rouge": "Red",
  "Réfraction": "Refraction",
  "S'améliore demain": "Improving tomorrow",
@@ -1388,18 +1417,56 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._fcUnsub();
     this._lastHtml = null;
     this._renderSnap = null;
+    // un echec de shader est definitif pour une config donnee, pas pour la suivante :
+    // sans cette remise a zero, le GL des effets resterait coupe jusqu'au rechargement.
+    this._fxGlBroken = false;
     // iPad/mobile : classe low-power → coupe scanline/glitch + fige les SVG animés.
     // Posé ici, PAS au constructor (NotSupportedError).
     if (WNC_IS_LOW_POWER) this.classList.add('low-power');
-    // typo Orbitron optionnelle : la @font-face doit vivre dans le DOCUMENT (une
-    // @font-face dans un shadow DOM n'est pas fiable) → lien Google Fonts injecté 1x.
+    // typo Orbitron optionnelle : la @font-face embarquee vit dans le DOCUMENT (niveau module).
     this.classList.toggle('wnc-orbitron', !!this._config.orbitron);
-    if (this._config.orbitron && !document.getElementById('wnc-orbitron-font')) {
-      const l = document.createElement('link');
-      l.id = 'wnc-orbitron-font'; l.rel = 'stylesheet';
-      l.href = 'https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap';
-      document.head.appendChild(l);
+    this._rmApply();
+  }
+
+  // L'element clavier de la lune n'existe pour le clavier que si le tap fait quelque chose
+  // (passage E.T./Noel/feu en cours d'eligibilite, mouvement reduit coupe).
+  _moonKeySync() {
+    const k = this._elMoonKey;
+    if (!k) return;
+    const on = !!(this._etOn || this._noelOn || this._feuOn) && !this._rm();
+    k.hidden = !on;
+    if (!on) return;
+    const sz = this._config.fx_lune_taille;
+    k.style.width = k.style.height = sz + 'px';
+    k.setAttribute('aria-label', _t("Lune : relancer l'animation"));
+  }
+
+  // Point de verite « mouvement reduit » : option de la card ET reglage systeme.
+  _rm() {
+    return !!this._config && this._config.respect_reduced_motion !== false
+      && !!WNC_RM_MQ && WNC_RM_MQ.matches;
+  }
+
+  // La classe d'hote partage les regles CSS de .low-power (cf styles).
+  _rmApply() { this.classList.toggle('reduced-motion', this._rm()); }
+
+  // Le reglage systeme change en cours de vie : on rejoue un rendu complet, sans recharger.
+  _onRmChange() {
+    this._rmApply();
+    if (!this._built || !this._config) return;
+    // Les drapeaux d'easter eggs repartent a zero : sinon un passage ignore pendant le
+    // mouvement reduit ne se declencherait plus jamais (front montant deja consomme).
+    this._etOn = false; this._noelOn = false; this._feuOn = 0; this._avrilOn = false;
+    if (this._rm()) {
+      this._stopStorm(); this._stopNight();
+      this._etStop(); this._noelStop(); this._feuStop(); this._avrilStop();
+      if (this._glitchTimer) { clearTimeout(this._glitchTimer); this._glitchTimer = null; }
+      for (const e of this.shadowRoot.querySelectorAll('.wshoot')) e.remove();
     }
+    this._stopHeat();   // _render le relance (boucle) ou le fige (mouvement reduit)
+    this._renderSnap = null;
+    this._skyLast = 0; this._aurLast = 0; this._fxLast = 0;
+    this._render();
   }
 
   set hass(hass) {
@@ -1521,6 +1588,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
         <div class="wbeam"></div>
         ${this._config.neon_fx ? '<div class="wscan"></div>' : ''}
         <div class="winner"></div>
+        <span class="wmoonkey" role="button" tabindex="0" hidden></span>
       </ha-card></div>`;
     this._elCard = this.shadowRoot.querySelector('ha-card');
     this._elSky = this.shadowRoot.querySelector('.wsky');
@@ -1532,6 +1600,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._config.sky) this._skyInit();
     this._elFx = this.shadowRoot.querySelector('.wfxlayer');
     this._elMoonGl = this.shadowRoot.querySelector('.wmoongl');
+    this._elMoonKey = this.shadowRoot.querySelector('.wmoonkey');
     this._elEt = this.shadowRoot.querySelector('.wet');
     this._elNoel = this.shadowRoot.querySelector('.wnoel');
     this._elFeu = this.shadowRoot.querySelector('.wfeu');
@@ -1563,15 +1632,24 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
     // E.T. : un tap sur la lune relance le passage. Hit-test sur le disque, pas de
     // calque cliquable : .winner (z-index 2) couvre la card et doit garder ses clics.
+    const moonTap = () => {
+      if (this._feuOn) this._feuSalve(0, this._feuOn);
+      else if (this._noelOn) this._noelPass(0); else this._etPass(0);
+    };
     this._elCard.addEventListener('click', e => {
       if (!(this._etOn || this._noelOn || this._feuOn) || e.target.closest('[data-atmo],[data-t]')) return;
       const r = this._elCard.getBoundingClientRect();
       const R = this._config.fx_lune_taille / 2;
       const dx = e.clientX - (r.right - 16 - R), dy = e.clientY - (r.top + 8 + R);
-      if (dx * dx + dy * dy <= R * R * 1.3) {
-        if (this._feuOn) this._feuSalve(0, this._feuOn);
-        else if (this._noelOn) this._noelPass(0); else this._etPass(0);
-      }
+      if (dx * dx + dy * dy <= R * R * 1.3) moonTap();
+    });
+    // Equivalent clavier du tap sur la lune : un seul element focusable, invisible et
+    // insensible au pointeur (le hit-test ci-dessus garde la souris), affiche seulement
+    // quand un passage est relancable (cf _moonKeySync).
+    this._elMoonKey.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();   // Espace ne doit pas faire defiler la page
+      if (!e.repeat && (this._etOn || this._noelOn || this._feuOn)) moonTap();
     });
 
     // Délégation de clic → more-info HA (pastilles Atmo + température). Posé 1x.
@@ -1649,6 +1727,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._rmOnChange) _wncRmUnlisten(this._rmOnChange);
     this._skyStop();
     this._fcUnsub();
     this._fxGlStop();
@@ -1779,7 +1858,10 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._fxOff) { this._fxRAF = null; return; }
     this._fxRAF = requestAnimationFrame(this._fxTickB);
     if (document.hidden) return;
-    if (now - (this._fxLast || 0) < (WNC_IS_LOW_POWER ? 66 : 33)) return;  // 15/30 fps
+    // 15/30 fps ; 1 Hz en mouvement reduit (positions gelees, le calque GL repeint a l'identique
+    // car la plaque du ciel peut avoir change entre-temps).
+    const rm = this._rm();
+    if (now - (this._fxLast || 0) < (rm ? 1000 : (WNC_IS_LOW_POWER ? 66 : 33))) return;
     this._fxLast = now;
     if (!this._fitCanvas(cv)) return;
     const ctx = cv.getContext('2d'), dpr = cv._dpr, W = cv._w, H = cv._h;
@@ -1790,7 +1872,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // le voile 2D reste le fallback si WebGL est indisponible ; des que le contexte
     // FX existe, les nappes billboards (_fogFboDraw) + le voile GLSL FX_FOG suffisent,
     // le peindre ici aussi le dessinerait deux fois.
-    if (this._fogLevel > 0 && !this._fxGl) this._drawFog(ctx, W, H, now);
+    if (this._fogLevel > 0 && !this._fxGl) this._drawFog(ctx, W, H, rm ? 9000 : now);
     if (this._windOn || this._rainLevel > 0 || this._rainSplash.length || this._bolt) {
       ctx.save();
       ctx.beginPath(); ctx.rect(0, 0, W, fxH); ctx.clip();   // vent/pluie/éclair : zone hero
@@ -1805,7 +1887,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // la scene qu'on regarde a travers la vitre. TOUTE la card, previsions comprises :
     // pas de coupure nette au divider comme la pluie.
     if (this._fxSnowLvl > 0 && !this._snowGlOn()) {
-      this._drawSnow(ctx, W, H, now);
+      this._drawSnow(ctx, W, H, rm ? 9000 : now);
     }
     if (this._fxGl) this._fxGlDraw(now);
   }
@@ -1819,8 +1901,9 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const speed = 0.4 + intensity * 1.4;               // vitesse globale du flux
 
     // PARTICULES portées par le flux (poussières/feuilles) — petites traînées.
+    const mv = this._rm() ? 0 : 1;   // image figee : positions conservees d'une frame a l'autre
     const resetPart = (p) => {
-      p.x = -8 - Math.random() * 40;
+      p.x = mv ? -8 - Math.random() * 40 : Math.random() * W;   // figee : semis sur toute la largeur
       p.y = Math.random() * H;
       p.r = 0.7 + Math.random() * 1.8;
       p.sp = 0.5 + Math.random() * 0.9;
@@ -1838,8 +1921,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
       const p = this._windParts[i];
       if (p.reset || p.x === undefined) resetPart(p);
       const vx = speed * 2.4 * p.sp;
-      p.x += vx;
-      p.ph += 0.04 * p.freq * (0.5 + intensity * 1.5);
+      p.x += vx * mv;
+      p.ph += 0.04 * p.freq * (0.5 + intensity * 1.5) * mv;
       const yy = p.y + Math.sin(p.ph) * p.amp;
       ctx.globalAlpha = p.a * (0.5 + intensity * 0.5);
       ctx.lineWidth = p.r;
@@ -1860,6 +1943,10 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // éclaboussures déjà en vol finissent leur course au lieu de disparaître d'un coup.
     const level = this._rainGlassOnly ? 0 : (this._rainLevel || 0);
     const drops = this._rainDrops, splash = this._rainSplash;
+    const mv = this._rm() ? 0 : 1;   // image figee : gouttes semees sur toute la hauteur, immobiles
+    // les eclaboussures en cours s'eteindraient frame par frame : a 1 Hz l'image
+    // continuerait de changer pendant des dizaines de secondes apres la bascule
+    if (!mv) splash.length = 0;
     if (level <= 0 && !splash.length) { drops.length = 0; return; }
 
     const newDrop = (init) => {
@@ -1868,12 +1955,12 @@ class WeatherNeonCardWebgl extends HTMLElement {
         len: 8 + sc * 14, vx: 1.2 + sc * 1.5, vy: 7 + sc * 9, sc, a: 0.25 + sc * 0.45 };
     };
     const target = Math.round(level * (WNC_IS_LOW_POWER ? 35 : 120));  // densité ∝ niveau
-    while (drops.length < target) drops.push(newDrop(drops.length < target / 2));
+    while (drops.length < target) drops.push(newDrop(!mv || drops.length < target / 2));
     if (drops.length > target) drops.length = target;
 
     ctx.lineCap = 'round';
     for (let i = 0; i < drops.length; i++) {
-      const d = drops[i]; d.x += d.vx; d.y += d.vy;
+      const d = drops[i]; d.x += d.vx * mv; d.y += d.vy * mv;
       ctx.globalAlpha = d.a; ctx.strokeStyle = 'rgba(170,230,255,.9)'; ctx.lineWidth = 0.6 + d.sc * 1.2;
       ctx.beginPath(); ctx.moveTo(d.x, d.y); ctx.lineTo(d.x - d.vx * 1.6, d.y - d.len); ctx.stroke();
       if (d.y > H) {                                       // impact → cercle d'éclaboussure
@@ -1911,7 +1998,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     }
     const breath = 0.75 + 0.25 * Math.sin(now / 4000);   // le brouillard respire
     for (const b of this._fogBlobs) {
-      b.x -= b.v;
+      if (!this._rm()) b.x -= b.v;
       if (b.x + b.rx < 0) { b.x = W + b.rx; b.y = H * (0.22 + Math.random() * 0.7); }
       const yy = b.y + Math.sin(now / 2600 + b.ph) * 6;   // bob vertical doux
       const g = ctx.createRadialGradient(b.x, yy, 0, b.x, yy, b.rx);
@@ -1954,6 +2041,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
   }
 
   _fireBolt() {
+    if (this._rm()) return;   // un eclair = flash plein ecran : jamais en mouvement reduit
     const cv = this._elFxCv;
     if (!cv || !this._fitCanvas(cv)) return;
     const H = Math.min(this._fxH || cv._h, cv._h);
@@ -1964,6 +2052,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
   // GLITCH ferme les yeux à l'éclair ; caché, il sort d'abord (≈0.5 s pour émerger du divider).
   _glitchBlink() {
+    if (this._rm()) return;
     const c = this._config;
     const cat = c.glitch && this._elInner && this._elInner.querySelector('.wcat');
     if (!cat || this._elInner.classList.contains('w-narrow')) return;
@@ -2013,7 +2102,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
   // orage : éclairs par rafales espacées (4,5–11 s), premier coup rapide
   _startStorm() {
-    if (this._stormTimer) return;
+    if (this._stormTimer || this._rm()) return;
     const sched = (delay) => {
       this._stormTimer = setTimeout(() => {
         if (!document.hidden) this._fireBolt();
@@ -2030,7 +2119,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
   // nuit claire : étoiles filantes one-shot par rafales espacées (6–15 s)
   _startNight() {
-    if (this._nightTimer) return;
+    if (this._nightTimer || this._rm()) return;
     const sched = () => {
       this._nightTimer = setTimeout(() => {
         if (!document.hidden && !this._elInner.classList.contains('w-narrow')) this._shootStar();
@@ -2043,6 +2132,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._nightTimer) { clearTimeout(this._nightTimer); this._nightTimer = null; }
   }
   _shootStar() {
+    if (this._rm()) return;
     const fx = this._elFx && this._elFx.querySelector('.wfx');
     if (!fx) return;
     const s = document.createElement('span');
@@ -2135,7 +2225,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
       if (k < 1) this._frostRAF = requestAnimationFrame(render);
       else this._frostRAF = null;                       // fini → on laisse le givre figé
     };
-    this._frostRAF = requestAnimationFrame(render);
+    // Mouvement reduit : pas de croissance animee, on dessine directement l'etat final.
+    if (this._rm()) render(start + DUR); else this._frostRAF = requestAnimationFrame(render);
   }
 
   // Efface le givre (transition gel→sec)
@@ -2155,6 +2246,11 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const BASE = 0.018;                          // baseFrequency horizontale (= preview)
     const minDt = WNC_IS_LOW_POWER ? 66 : 33;    // 15 fps Companion / 30 fps PC
     const start = performance.now();
+    const apply = (t) => {
+      const fy = BASE * (2 + Math.sin(t * 0.6) * 0.4);  // fréquence verticale modulée
+      this._heatTurb.setAttribute('baseFrequency', `${BASE.toFixed(4)} ${fy.toFixed(4)}`);
+      this._heatTurb.setAttribute('seed', 7 + (Math.floor(t * 8) % 50));
+    };
     const draw = (now) => {
       // hors ecran : on desarme au lieu de re-armer (relance par _loopsResume)
       if (this._fxOff) { this._heatRAF = null; return; }
@@ -2162,11 +2258,10 @@ class WeatherNeonCardWebgl extends HTMLElement {
       if (document.hidden) return;
       if (now - (this._heatLast || 0) < minDt) return;
       this._heatLast = now;
-      const t = (now - start) / 1000;
-      const fy = BASE * (2 + Math.sin(t * 0.6) * 0.4);  // fréquence verticale modulée
-      this._heatTurb.setAttribute('baseFrequency', `${BASE.toFixed(4)} ${fy.toFixed(4)}`);
-      this._heatTurb.setAttribute('seed', 7 + (Math.floor(t * 8) % 50));
+      apply((now - start) / 1000);
     };
+    // Mouvement reduit : une turbulence fixe, aucune boucle (le filtre garde son etat).
+    if (this._rm()) { apply(0); return; }
     this._heatRAF = requestAnimationFrame(draw);
   }
   _stopHeat() {
@@ -2598,6 +2693,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
       this._feuSalve(noelNow ? 900 + this._config.fx_noel_duree * 1000 : 900, feuNow);
     if (!feuNow) this._feuStop();
     this._feuOn = feuNow;
+    this._moonKeySync();
     // Poisson d'avril : date du jour reelle (pas celle du soir), de jour comme de nuit.
     const today = new Date();
     const avrilNow = !!this._config.fx_avril && (this._config.fx_avril_toujours ||
@@ -2721,7 +2817,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
   // brique d'anim au hasard, replonge. Discret — apparition espacée, pas permanent.
   _startGlitchLife() {
     if (this._glitchTimer) { clearTimeout(this._glitchTimer); this._glitchTimer = null; }
-    if (!this._config.glitch) return;
+    if (!this._config.glitch || this._rm()) return;
     const cat = this._elInner.querySelector('.wcat');
     if (!cat) return;
 
@@ -3063,7 +3159,10 @@ void main(){
   // temps grand (nuages qui saccadent apres des jours), donc on rebase l'origine :
   // apres plus de 1 h seulement si la boucle revient d'une absence (onglet cache,
   // hors ecran : frames > 1 s d'ecart, le saut est invisible), et de force apres 6 h.
+  // Mouvement reduit : horloge constante (meme valeur que la neige, t = 9), l'image
+  // redessinee est donc strictement identique d'une frame a l'autre.
   _shaderClock(k, now) {
+    if (this._rm()) return 9;
     const m = this._shClk || (this._shClk = {});
     const s = m[k] || (m[k] = { t0: now, last: now });
     const el = now - s.t0;
@@ -3086,7 +3185,9 @@ void main(){
     if (document.hidden) return;
     const now = performance.now();
     // 30 fps suffit largement pour un ciel qui derive ; 15 sur iPad/low-power.
-    const step = WNC_IS_LOW_POWER ? 66 : 33;
+    // Mouvement reduit : 1 Hz, l'horloge etant constante l'image ne bouge pas, mais un
+    // changement de meteo/de taille est repeint au tour suivant sans rearmement.
+    const step = this._rm() ? 1000 : (WNC_IS_LOW_POWER ? 66 : 33);
     if (this._skyLast && now - this._skyLast < step) return;
     this._skyLast = now;
 
@@ -3136,7 +3237,8 @@ void main(){
     // son orange en UNE frame. On glisse sur ~8 s. Etat local au rendu, jamais
     // persiste : au montage il part deja a la bonne valeur, pas de fondu parasite.
     const duskTarget = this._isNight ? 0 : 1;
-    if (this._duskEase === undefined) this._duskEase = duskTarget;
+    // horloge constante en mouvement reduit : dDt vaudrait 0 et la rampe ne finirait jamais
+    if (this._duskEase === undefined || this._rm()) this._duskEase = duskTarget;
     else {
       const dDt = Math.min(0.1, Math.max(0, t - (this._duskLast || t)));
       this._duskEase += (duskTarget - this._duskEase) * Math.min(1, dDt / 8);
@@ -3270,12 +3372,19 @@ void main(){
 
   // (Re)construit le buffer des nappes pour fogx_count courant ; _fogCount garde
   // le nombre de sommets uploade pour detecter un changement de config.
+  // Nombre de nappes : 0 est une valeur voulue (aucune nappe), seul un compte absent,
+  // negatif ou non fini retombe sur FOG_N.
+  _fogN() {
+    const n = this._config && this._config.fogx_count;
+    return Number.isFinite(n) && n >= 0 ? Math.floor(n) : WeatherNeonCardWebgl.FOG_N;
+  }
+
   _fogUpload(gl) {
     // buffer STATIQUE : N nappes x 6 sommets (2 triangles), chaque sommet porte son
     // coin (-1..1) + son uv (0..1) + une graine d'instance (aRnd) commune aux 6
     // sommets d'une meme nappe -- c'est elle qui fait tourner/vivre la nappe entiere
     // ensemble dans le vertex shader, sans instancing.
-    const N = (this._config && this._config.fogx_count) || WeatherNeonCardWebgl.FOG_N;
+    const N = this._fogN();
     const CORNERS = [[-1, -1, 0, 0], [1, -1, 1, 0], [1, 1, 1, 1],
                       [-1, -1, 0, 0], [1, 1, 1, 1], [-1, 1, 0, 1]];
     const verts = new Float32Array(N * 6 * 7);   // aCorner(2) aUv(2) aRnd(3)
@@ -3327,7 +3436,7 @@ void main(){
   _fogFboDraw(gl, now, cvW, cvH, c, level) {
     if (!this._fogFbo || !this._fogProg) return;
     // fogx_count modifie en cours de route : on reconstruit seulement le buffer
-    if (this._fogCount !== (c.fogx_count || WeatherNeonCardWebgl.FOG_N) * 6) this._fogUpload(gl);
+    if (this._fogCount !== this._fogN() * 6) this._fogUpload(gl);
     if (this._fogW !== cvW || this._fogH !== cvH) {
       gl.bindTexture(gl.TEXTURE_2D, this._fogFboTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cvW, cvH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -3364,7 +3473,7 @@ void main(){
       gl.uniform1i(U.uTex, 0);
     }
 
-    gl.drawArrays(gl.TRIANGLES, 0, this._fogCount);
+    if (this._fogCount > 0) gl.drawArrays(gl.TRIANGLES, 0, this._fogCount);   // 0 nappe : rien a tracer
 
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.viewport(0, 0, cvW, cvH);
@@ -3453,7 +3562,6 @@ void main(){
     // plafond materiel de gl_PointSize : 64 sur certains GPU mobiles, 1024 ailleurs.
     const r = gl.getParameter(gl.ALIASED_POINT_SIZE_RANGE);
     this._snowPtMax = (r && r[1]) || 64;
-    this._snowRM = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
     this._snowBuf = buf; this._snowProg = prog;
     this._snowFboTex = tex; this._snowFbo = fbo;   // EN DERNIER : rend _snowGlOn() vrai
   }
@@ -3504,7 +3612,7 @@ void main(){
     this._snowLast = now;
     const w = this._snowWind || (this._snowWind = { cur: 0, force: 0, target: 0, tmr: 0 });
     let t = 9;                                   // reduced-motion : image figee (banc)
-    if (!this._snowRM) {
+    if (!this._rm()) {
       t = this._snowT = ((this._snowT || 0) + dt) % 3600;
       // vent : une RAFALE qui s'installe, passe par zero et s'inverse (banc stepWind).
       // Sans passage par zero la neige part en travers en permanence.
@@ -3989,8 +4097,11 @@ void main(){
 
     // la texture arrive de facon asynchrone (decodage JPEG) -- on redessine a l'arrivee
     const img = new Image();
+    this._moonImg = img;
     img.onload = () => {
-      if (this._moonGl !== gl || gl.isContextLost()) return;
+      // _moonImg change a chaque _moonInit/_moonStop : un chargement perime ne cree
+      // pas de texture (le contexte etant partage, _moonGl === gl ne suffit pas).
+      if (this._moonGl !== gl || this._moonImg !== img || gl.isContextLost()) return;
       const t = gl.createTexture();
       gl.activeTexture(gl.TEXTURE0);
       gl.bindTexture(gl.TEXTURE_2D, t);
@@ -4037,7 +4148,8 @@ void main(){
     const st = m[key] = { t: null };
     const img = new Image();
     img.onload = () => {
-      if (this._moonGl !== gl || gl.isContextLost()) return;
+      // la table est remplacee par _moonStop/_moonInit : un chargement perime est ignore
+      if (this._moonGl !== gl || this._moonAuxT !== m || m[key] !== st || gl.isContextLost()) return;
       const t = gl.createTexture();
       gl.activeTexture(gl.TEXTURE0 + unit);
       gl.bindTexture(gl.TEXTURE_2D, t);
@@ -4060,7 +4172,7 @@ void main(){
     if (gl && this._moonAuxT && !gl.isContextLost()) {
       for (const k in this._moonAuxT) if (this._moonAuxT[k].t) gl.deleteTexture(this._moonAuxT[k].t);
     }
-    this._moonAuxT = null;
+    this._moonAuxT = null; this._moonImg = null;
     this._glWipe(this._elMoonGl);
     this._moonGl = null; this._moonP = null;
     this._moonTex = null; this._moonU = null; this._moonSnap = '';
@@ -4094,7 +4206,13 @@ void main(){
       c.fx_lune_crane, c.fx_lune_crane_taille, c.fx_lune_crane_y, c.fx_lune_crane_inv,
       c.fx_lune_etoile_phase, c.fx_lune_etoile_eclat, c.fx_lune_etoile_halo,
       c.fx_lune_etoile_halok].join(',') : '';
-    const snap = [cv.width, cv.height, ph.toFixed(4), size, mode, fx].join(':');
+    // Tous les uniformes qui changent le rendu entrent dans la cle : sinon un reglage
+    // modifie a chaud (halo, relief, teinte...) reste sans effet tant que phase/taille/mode
+    // ne bougent pas.
+    const base = [c.fx_lune_doux, c.fx_lune_relief, c.fx_lune_limbe, c.fx_lune_cendree,
+      c.fx_lune_nuit, c.fx_lune_teinte, c.fx_lune_eclat, c.fx_lune_halo, c.fx_lune_halok,
+      c.fx_lune_incl, c.fx_lune_grain].join(',');
+    const snap = [cv.width, cv.height, ph.toFixed(4), size, mode, base, fx].join(':');
     if (snap === this._moonSnap) return;
     this._moonSnap = snap;
     const u1 = (n, v) => { if (U[n] != null) gl.uniform1f(U[n], v); };
@@ -4649,7 +4767,7 @@ void main(){
   _etPass(delay) {
     const svg = this._elEt;
     if (!svg || !svg.animate) return;
-    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (this._rm()) return;
     clearTimeout(this._etTimer);
     this._etTimer = setTimeout(() => {
       this._etTimer = null;
@@ -4722,7 +4840,7 @@ void main(){
   _noelPass(delay) {
     const svg = this._elNoel;
     if (!svg || !svg.animate) return;
-    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (this._rm()) return;
     clearTimeout(this._noelTimer);
     this._noelTimer = setTimeout(() => {
       this._noelTimer = null;
@@ -4786,7 +4904,7 @@ void main(){
   _feuSalve(delay, mode) {
     const cv = this._elFeu;
     if (!cv || !cv.getContext) return;
-    if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    if (this._rm()) return;
     clearTimeout(this._feuTimer);
     this._feuTimer = setTimeout(() => {
       this._feuTimer = null;
@@ -4889,6 +5007,7 @@ void main(){
   // Poisson d'avril : condition et temperature absurdes 3 s, puis l'aveu, puis le vrai.
   // On ne restaure que si le render n'a pas deja reecrit les elements entre-temps.
   _avrilPrank(delay) {
+    if (this._rm()) return;
     clearTimeout(this._avrilTimer);
     this._avrilTimer = setTimeout(() => {
       const cond = this._elInner && this._elInner.querySelector('.wcond');
@@ -4899,6 +5018,14 @@ void main(){
       const DEG = ['451', '-273', '9000', '42', '3,14'];
       const c0 = cond.textContent, d0 = temp.getAttribute('data-t');
       const t0 = Array.from(temp.childNodes, n => n.cloneNode(true));
+      // Remise en etat partagee avec _avrilStop : sans elle, un arret en cours de blague
+      // laisse les faux textes tant que le DOM n'est pas reconstruit.
+      this._avrilRestore = () => {
+        this._avrilRestore = null;
+        if (!cond.isConnected) return;
+        cond.textContent = c0; temp.replaceChildren(...t0.map(n => n.cloneNode(true)));
+        if (d0 != null) temp.setAttribute('data-t', d0);
+      };
       const unit = (temp.querySelector('small') || {}).textContent || '°';
       const deg = DEG[Math.floor(Math.random() * DEG.length)];
       cond.textContent = _t(FAUX[Math.floor(Math.random() * FAUX.length)]);
@@ -4911,15 +5038,16 @@ void main(){
         if (cond.isConnected && cond.textContent === fake) cond.textContent = _t("Poisson d'avril !") + ' 🐟';
         this._avrilTimer = setTimeout(() => {
           this._avrilTimer = null;
-          if (!cond.isConnected) return;
-          cond.textContent = c0; temp.replaceChildren(...t0);
-          if (d0 != null) temp.setAttribute('data-t', d0);
+          if (this._avrilRestore) this._avrilRestore();
         }, 1400);
       }, 3000);
     }, delay || 0);
   }
 
-  _avrilStop() { clearTimeout(this._avrilTimer); this._avrilTimer = null; }
+  _avrilStop() {
+    clearTimeout(this._avrilTimer); this._avrilTimer = null;
+    if (this._avrilRestore) this._avrilRestore();
+  }
 
   _aurMoonLit() { return (1 - Math.cos(moonPhase() * 2 * Math.PI)) / 2; }
 
@@ -5084,7 +5212,8 @@ void main(){
     if (gl.isContextLost()) { this._aurStop(false); return; }   // figee ; WNC_GL relancera
     if (this._fxOff) return;            // hors ecran : l'IntersectionObserver du moteur FX
     const now = performance.now();
-    const step = WNC_IS_LOW_POWER ? 66 : 33;   // 30 fps ; 15 sur iPad/low-power
+    const rm = this._rm();
+    const step = rm ? 1000 : (WNC_IS_LOW_POWER ? 66 : 33);   // 30 fps ; 15 sur iPad/low-power ; 1 Hz fige
     if (this._aurLast && now - this._aurLast < step) return;
     this._aurLast = now;
 
@@ -5092,7 +5221,7 @@ void main(){
     // contexte partage : begin() pose viewport + blend et efface (cf _skyLoop)
     if (WNC_GL.begin(cv.width, cv.height) !== gl) return;
     WNC_GL.use(this._aurP);
-    const c = this._config, U = this._aurU, t = (now - this._aurT0) / 1000;
+    const c = this._config, U = this._aurU, t = rm ? 12 : (now - this._aurT0) / 1000;   // fige : au-dela du fondu d'apparition (6 s)
     const u1 = (n, v) => { if (U[n] != null) gl.uniform1f(U[n], v); };
     gl.uniform2f(U.uRes, cv.width, cv.height);
     u1('uTime', t);
@@ -5122,6 +5251,9 @@ void main(){
   // (_wglGraft au connectedCallback), la seule de la famille qui n'ait jamais eu ce bug.
   connectedCallback() {
     this._fitGen++;
+    this._rmOnChange = this._rmOnChange || (() => this._onRmChange());
+    _wncRmListen(this._rmOnChange);
+    this._rmApply();
     this._fetchForecast();
     if (!this._built || !this._config) return;   // le premier montage passe par _render()
     if (!this._ro) this._observeSize();
@@ -5140,6 +5272,10 @@ void main(){
     // meme raison pour l'aurore : son contexte a pu etre evince pendant l'absence.
     // _aurEnsure ne rallume que si le verdict de la derniere passe etait vrai.
     this._aurEnsure();
+    // les moteurs d'effets ne repartent que dans _render : sans cet appel ils attendaient
+    // le prochain etat pousse par HA, et le dessin 2D du givre restait affiche a nu
+    // (calque GL ferme au detachement) pendant ce delai.
+    this._render();
   }
 
   getGridOptions() { return { columns: 12, min_columns: 6 }; }
@@ -5210,7 +5346,10 @@ WeatherNeonCardWebgl.styles = `
       0 0 30px var(--acc),
       0 0 60px color-mix(in srgb, var(--acc) 40%, transparent); }
   .wtemp[role="button"] { cursor:pointer; }
-  .wtemp:focus-visible, .watmo:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  .wtemp:focus-visible, .watmo:focus-visible, .wmoonkey:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
+  /* meme ancre que .wmoon ; pointer-events:none : le tap souris passe par le hit-test du disque */
+  .wmoonkey { position:absolute; right:16px; top:8px; z-index:3; border-radius:50%; pointer-events:none; }
+  .wmoonkey[hidden] { display:none; }
   .wtemp small { font-size:.5em; vertical-align:super; margin-left:2px; opacity:.85; font-weight:500; }
   .wnow { flex:1; min-width:0; position:relative; }
   .wicon .wico { filter:drop-shadow(0 0 10px color-mix(in srgb, var(--acc) 28%, transparent)); }
@@ -5375,17 +5514,18 @@ WeatherNeonCardWebgl.styles = `
      Posé via JS (WNC_IS_LOW_POWER) → n'affecte que l'iPad, jamais le PC.
      Les canvas tournent en version allégée ; ici on coupe scanline + glitch +
      toutes les animations CSS résiduelles (drift nuages, comète, twinkle, etc.). */
-  :host(.low-power) .wscan { display:none; }
-  :host(.low-power) .wcatband { display:none; }   /* GLITCH off */
-  :host(.low-power) .wforecast::after { display:none; }   /* comète figée sinon */
-  :host(.low-power) * { animation:none !important; }
+  :host(.low-power) .wscan, :host(.reduced-motion) .wscan { display:none; }
+  :host(.low-power) .wcatband, :host(.reduced-motion) .wcatband { display:none; }   /* GLITCH off */
+  :host(.low-power) .wforecast::after, :host(.reduced-motion) .wforecast::after { display:none; }   /* comète figée sinon */
+  :host(.low-power) *, :host(.reduced-motion) * { animation:none !important; }
   /* …MAIS on garde le minimum d'animation météo voulu sur Companion :
-     pluie/neige CSS de secours + étoile filante (one-shot court). */
-  :host(.low-power) .wfx-rain  { animation-name:wrain !important; }
-  :host(.low-power) .wsnowfield          { animation:wsnowfall 3s linear infinite !important; }
-  :host(.low-power) .wsnowfield::after   { animation:wsnowfall 6s linear infinite !important; }
-  :host(.low-power) .wsnowfield::before  { animation:wsnowfall 9s linear infinite !important; }
-  :host(.low-power) .wshoot { animation:wshootA .9s ease-out forwards !important; }
+     pluie/neige CSS de secours + étoile filante (one-shot court).
+     Exclu en reduced-motion : la classe partage les regles d'arret ci-dessus. */
+  :host(.low-power:not(.reduced-motion)) .wfx-rain  { animation-name:wrain !important; }
+  :host(.low-power:not(.reduced-motion)) .wsnowfield          { animation:wsnowfall 3s linear infinite !important; }
+  :host(.low-power:not(.reduced-motion)) .wsnowfield::after   { animation:wsnowfall 6s linear infinite !important; }
+  :host(.low-power:not(.reduced-motion)) .wsnowfield::before  { animation:wsnowfall 9s linear infinite !important; }
+  :host(.low-power:not(.reduced-motion)) .wshoot { animation:wshootA .9s ease-out forwards !important; }
 
   /* typo Orbitron optionnelle (config orbitron: true) */
   :host(.wnc-orbitron) .wtemp, :host(.wnc-orbitron) .wd, :host(.wnc-orbitron) .whi {
@@ -6235,6 +6375,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._toggle('neon_fx', 'Scanlines + temp glitchée', true);
       this._toggle('glitch', 'GLITCH le chat', true);
       this._toggle('orbitron', 'Typo Orbitron', false);
+      this._toggle('respect_reduced_motion', 'Respecter le réglage système « réduire les animations »', true);
       this._toggle('mood_accent', 'Accent couleur = condition', true);
       this._toggle('reactive_bg', 'Fond réactif (écrase card-mod)', false);
       this._toggle('night_from_sun', 'Jour/nuit recalculé (lux, repli soleil)', true);

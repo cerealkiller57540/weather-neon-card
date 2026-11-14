@@ -113,7 +113,8 @@ pollen_entity: sensor.atmo_france_qualite_globale_pollen_<zone>
 | `particles` | `true` | All atmospheric effects |
 | `neon_fx` | `true` | Scanlines and glitched temperature |
 | `frost` / `frost_below` | `true` / `3` | Frost below this temperature (°C) |
-| `orbitron` | `false` | Orbitron font for temperature and days |
+| `orbitron` | `false` | Orbitron font for temperature and days (embedded, no request to Google Fonts; see `NOTICE.md`) |
+| `respect_reduced_motion` | `true` | Freeze every animation when the system asks for reduced motion |
 
 | Option | Default | Description |
 |---|---|---|
