@@ -1,16 +1,16 @@
 /**
- * weather-neon-card v3.10.6
+ * weather-neon-card v3.11.0
  * Carte météo néon Neo Tokyo pour Home Assistant.
  * Icônes SVG animées · accent couleur par météo · forecast en tuiles + barre min/max ·
  * FX canvas (pluie, vent, brouillard, givre, éclairs ramifiés) · nuit étoilée + lune à
  * phase réelle · vigilance Météo-France · Atmo France (air/pollens) · GLITCH le chat.
  *
  * Installation :
- *   1. Copier dans /config/www/weather-neon-card.js
- *   2. Ressources HA → /local/weather-neon-card.js (type: module)
+ *   1. Copier dans /config/www/weather-neon-card-webgl.js
+ *   2. Ressources HA → /local/weather-neon-card-webgl.js (type: module)
  *
  * Config minimale :
- *   type: custom:weather-neon-card
+ *   type: custom:weather-neon-card-webgl   (l'ancien type custom:weather-neon-card reste un alias)
  *   entity: weather.ma_station
  *
  * Options (défaut) :
@@ -39,7 +39,7 @@
  *   air_entity (+ air_entity_next) / pollen_entity (+ pollen_entity_next)
  */
 
-const VERSION = '3.10.6';
+const VERSION = '3.11.0';
 
 // ── Device detection (cf CARDS-METHOD.md) — allège les effets canvas sur tablette/mobile
 const WNC_IS_IPAD = /iPad/.test(navigator.userAgent) ||
@@ -222,14 +222,19 @@ const WNC_GL = {
 // ═══════════════════════════════════════════════════════
 // 0 est une valeur legitime pour tous les reglages du ciel : `??` seul suffirait,
 // mais on veut aussi rejeter les chaines vides que renvoie un champ d'editeur vide.
-const _n = (v, d) => (v === undefined || v === null || v === '' ? d : Number(v));
+// Number('abc') vaut NaN : on rend le defaut si le resultat n'est pas fini.
+const _n = (v, d) => {
+  if (v === undefined || v === null || v === '') return d;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : d;
+};
 
 function buildConfig(raw) {
   return {
     entity:        raw.entity        || null,
     name:          raw.name          || null,
     forecast_type: raw.forecast_type || 'daily',
-    forecast_count: raw.forecast_count ?? 5,
+    forecast_count: _n(raw.forecast_count, 5),
     reactive_bg:   raw.reactive_bg   ?? false,  // défaut: laisse le fond/glow du thème (card-mod)
     alert_entity:  raw.alert_entity  || null,  // ex: sensor.<dept>_weather_alert (vigilance MF)
     // ── ciel WebGL (variante webgl) ──────────────────────────────────────────
@@ -256,7 +261,7 @@ function buildConfig(raw) {
     // 3.00 et pas plus bas : ce reglage est MULTIPLIE par moonGain, l'illumination
     // reelle de la lune, qui le reduit fortement hors pleine lune.
     // ⚠️ 3.00 est la BORNE du clamp GLSL (clamp(uNightLit,0.0,3.0)) : plus haut n'aurait
-    // aucun effet. Pour aller au-dela il faudrait relever le clamp dans sky_shader.py.
+    // aucun effet. Pour aller au-dela il faudrait relever le clamp dans le GLSL du ciel.
     sky_nuit_reflet:  _n(raw.sky_nuit_reflet,  3.00), // gain du lisere sur la face tournee vers la lune
     sky_nuit_plancher:_n(raw.sky_nuit_plancher,0.35), // plancher d'opacite du fond la nuit (s'ajoute a sky_fond)
     sky_nuit_portee:  _n(raw.sky_nuit_portee,  1.80), // portee du halo lunaire sur les nuages (grand = serre)
@@ -523,7 +528,7 @@ function buildConfig(raw) {
     fx_glitch_sortie_max:  _n(raw.fx_glitch_sortie_max, 8),
     particles:     raw.particles     ?? true,  // effets atmosphériques (CSS + canvas)
     frost:         raw.frost         ?? true,  // cristaux de givre quand temp ≤ frost_below
-    frost_below:   raw.frost_below   ?? 3,     // seuil °C de déclenchement du givre
+    frost_below:   _n(raw.frost_below, 3),     // seuil °C de déclenchement du givre
     neon_fx:       raw.neon_fx       ?? true,  // scanlines + temp glitchée (Neo Tokyo)
     mood_accent:   raw.mood_accent   ?? true,  // accent couleur de la card = condition météo
     orbitron:      raw.orbitron      ?? false, // typo Orbitron (Google Fonts) temp/jours
@@ -552,7 +557,7 @@ function buildConfig(raw) {
 }
 
 // familles de conditions (partagées entre particules, canvas et render)
-const WET_CONDS   = new Set(['rainy', 'pouring', 'lightning-rainy', 'snowy-rainy']);
+const WET_CONDS   = new Set(['rainy', 'rainy-night', 'pouring', 'lightning-rainy', 'snowy-rainy']);
 const SNOW_CONDS  = new Set(['snowy', 'hail']);
 const STORM_CONDS = new Set(['lightning', 'lightning-rainy']);
 const NIGHT_CONDS = new Set(['clear-night', 'partlycloudy-night']);
@@ -587,6 +592,17 @@ function isNight(hass, cfg, prev) {
 // devine le préfixe ville depuis weather.xxx → "xxx" (pour retrouver les sensors MF)
 function entityBase(weatherEntity) {
   return (weatherEntity || '').replace(/^weather\./, '');
+}
+
+// Facteur de conversion vers km/h d'apres l'unite de vent. Les seuils d'effets (12 km/h,
+// echarpe...) supposent des km/h. Unite absente/inconnue (km/h, Beaufort) : 1, inchange.
+function windToKmh(u) {
+  const s = String(u || '').toLowerCase().replace(/\s/g, '');
+  if (s === 'm/s' || s === 'ms-1' || s === 'm.s-1') return 3.6;
+  if (s === 'mph' || s === 'mi/h') return 1.609;
+  if (s === 'kn' || s === 'kt' || s === 'kts' || s === 'knot' || s === 'knots') return 1.852;
+  if (s === 'ft/s') return 1.09728;
+  return 1;
 }
 
 // Formate un attribut sun (sensor.sun_next_* = datetime ISO) en HH:MM local
@@ -652,7 +668,9 @@ function atmoPastille(hass, iconKey, entityId, nextEntityId) {
     }
   }
 
-  return `<span class="watmo" data-atmo="${escHtml(entityId)}" style="color:${safeCssColor(color)}">`
+  const kind = _t(iconKey === 'pollen' ? 'Pollens' : "Qualité de l'air");
+  return `<span class="watmo" data-atmo="${escHtml(entityId)}" role="button" tabindex="0"`
+       + ` aria-label="${escHtml(kind + ' : ' + label)}" style="color:${safeCssColor(color)}">`
        + `<span class="watmo-i">${MINI_ICONS[iconKey]}</span>`
        + `<b>${escHtml(label)}</b>${trend}</span>`;
 }
@@ -683,39 +701,6 @@ function svgWrap(inner, size, haloColor) {
 // nuage rempli (léger) + contour dégradé
 const _cloud = (c = GCY, x = 0, y = 0, sc = 1, fill = 'rgba(0,144,255,.10)') =>
   `<g transform="translate(${x} ${y}) scale(${sc})"><path d="M32 62 Q22 62 22 52 Q22 42 34 44 Q36 30 52 32 Q68 32 68 48 Q80 46 80 58 Q80 64 72 64 Z" fill="${fill}" stroke="${c}" stroke-width="2.5" stroke-linejoin="round"/></g>`;
-const _drops = (c = GCY, y = 66, n = 4, x0 = 34) =>
-  [...Array(n)].map((_, i) => `<line x1="${x0 + i * 11}" y1="${y}" x2="${x0 + i * 11}" y2="${y + 10}" stroke="${c}" stroke-width="2.5" stroke-linecap="round" opacity="0"><animate attributeName="opacity" values="0;1;0" dur="1s" begin="${i * 0.2}s" repeatCount="indefinite"/></line>`).join('');
-// éclair plein (polygone) avec glow
-const _bolt = (c = YEL) =>
-  `<polygon points="53,48 42,70 51,70 45,88 66,62 55,62 60,48" fill="${c}"><animate attributeName="opacity" values="1;.15;1;.5;1" dur="1.7s" repeatCount="indefinite"/></polygon>`;
-// flocon qui TOMBE (gravité) en tournant légèrement — la neige descend, elle ne tourne pas sur place.
-// animateTransform additif : translate (chute) + rotate (rotation douce) cumulés.
-const _flake = (x, y, c = GCY, dur = 2.6, delay = 0) =>
-  `<g transform="translate(${x} ${y})">
-     <animateTransform attributeName="transform" type="translate" additive="sum" values="0 -6; 0 12" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-     <animate attributeName="opacity" values="0;1;1;0" dur="${dur}s" begin="${delay}s" repeatCount="indefinite"/>
-     <g stroke="${c}" stroke-width="1.6">
-       <animateTransform attributeName="transform" type="rotate" values="0;360" dur="${dur * 1.4}s" begin="${delay}s" repeatCount="indefinite"/>
-       ${[0, 60, 120].map(a => `<line x1="${(-3.2 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y1="${(-3.2 * Math.sin(a * Math.PI / 180)).toFixed(1)}" x2="${(3.2 * Math.cos(a * Math.PI / 180)).toFixed(1)}" y2="${(3.2 * Math.sin(a * Math.PI / 180)).toFixed(1)}"/>`).join('')}
-     </g></g>`;
-
-// SOLEIL V1 : cœur dégradé radial + rayons triangulaires FIXES
-// (pas de rotation) + halo qui pulse. cx/cy = centre, sc = échelle (1 = pleine icône).
-const _sun = (cx = 50, cy = 48, sc = 1) => {
-  const rays = [...Array(12)].map((_, i) => {
-    const long = i % 2 === 0;
-    const r1 = long ? 20 : 22, r2 = long ? 6 : 11;  // longueur du rayon (vers le centre/extérieur)
-    return `<path d="M50 ${r2} L52.5 ${r1} L47.5 ${r1} Z" fill="#ffce4a" transform="rotate(${i * 30} 50 48)" opacity="${long ? 1 : .7}"/>`;
-  }).join('');
-  return `<g transform="translate(${cx - 50} ${cy - 48}) scale(${sc})" style="transform-origin:50px 48px">
-    <circle cx="50" cy="48" r="26" fill="#ff8a00" opacity=".30">
-      <animate attributeName="r" values="24;30;24" dur="3s" repeatCount="indefinite"/>
-      <animate attributeName="opacity" values=".30;.10;.30" dur="3s" repeatCount="indefinite"/></circle>
-    ${rays}
-    <circle cx="50" cy="48" r="15" fill="url(#wg-suncore)"/>
-  </g>`;
-};
-
 // >>> ICONS_COMPOSE (genere)
 // Genere par emit_js.py -- NE PAS EDITER A LA MAIN.
 // Source : weather-icons-neon/svg-compose/*.svg (compose.py + anim.py)
@@ -739,25 +724,9 @@ const ICONS_COMPOSE = {
   'windy-variant': `<defs><path id="wi-windy-variant-0" d="M61 90.6 C60.9 90.5 60.5 90.4 60.2 90.2 C56.2 89 54.4 83.7 57.1 81 C59.1 78.8 61.7 80.2 60 82.5 C58.2 84.9 60 87.6 63.4 87.6 C67.9 87.6 70.3 82.2 67 79 C65.4 77.5 65.9 77.5 54 77.4 C39.2 77.2 36.6 77.2 35 77.3 L33.7 77.5 L33 76.8 C32.1 75.9 32.1 75.4 32.9 74.6 L33.6 73.9 L39.8 74 C43.3 74 50.3 74.1 55.5 74.2 C64.8 74.3 65 74.3 66.3 74.7 C73.3 77.1 74 86.8 67.2 89.9 C66.6 90.2 65.9 90.5 65.8 90.6 C65.4 90.8 61.2 90.8 61 90.6 Z"/><path id="wi-windy-variant-1" d="M11.4 89.1 C10.7 88.8 9.6 87.6 9.5 86.9 C9.4 86.2 9.5 36.8 9.7 28.7 C9.8 22.4 9.9 23 8.5 21.5 C5.4 18.2 5.4 14.3 8.5 11.5 C15.1 5.5 24.3 12.2 20.3 20 C19.5 21.5 20.5 21.3 24.7 19.2 C27.4 17.8 32.8 15.5 34.9 14.8 C35.7 14.5 35.8 14.5 36.8 14.8 C37.3 14.9 39.1 15.3 40.8 15.6 C42.4 16 44.9 16.5 46.3 16.8 C47.7 17.1 50 17.6 51.3 17.9 C57.3 19.2 60.8 19.9 67.4 21.2 C69.4 21.6 71.7 22.1 72.5 22.2 C75.7 23 77.4 23.3 79 23.7 C87.9 25.5 90 26.3 91.8 28.3 C93.5 30.3 94.4 34.4 93.6 36.1 C93.5 36.2 93.2 37 92.8 37.7 C91.5 40.5 89.1 42.1 85.1 42.8 C84.4 42.9 82.9 43.1 81.8 43.3 C78.3 44 75.8 44.4 74.8 44.6 C74.2 44.6 72.9 44.9 71.8 45.1 C70.7 45.3 69.3 45.5 68.8 45.6 C68.2 45.7 67.3 45.9 66.7 46 C66.1 46.1 65.2 46.2 64.6 46.3 C64 46.4 63.1 46.6 62.5 46.7 C62 46.7 60.6 47 59.5 47.2 C58.4 47.4 57 47.6 56.5 47.7 C56 47.8 55 48 54.3 48.1 C53.6 48.2 51.9 48.5 50.5 48.8 C49.1 49 47.4 49.3 46.7 49.5 C46.1 49.6 44.3 49.9 42.7 50.2 C40 50.7 38.3 51 34.6 51.7 C32.3 52.1 31.6 51.8 25.9 47.5 C23.2 45.3 20.4 43.5 20.1 43.5 C19.7 43.6 19.7 43.6 19.7 49.7 C19.8 53.1 19.8 62.8 19.9 71.2 L20 86.5 L19.5 87.4 C18.6 89.2 13.8 90.2 11.4 89.1 Z M16.2 85.9 C16.7 85.4 16.3 23.8 15.7 23.5 C15.3 23.2 13.4 23.6 13.1 24 C12.8 24.4 12.9 85.7 13.1 86 C13.5 86.3 15.8 86.3 16.2 85.9 Z M32.9 48 C33.7 47.6 35.7 42.3 36.5 38.5 C38.1 30.3 37.5 18.6 35.4 18.1 C34.8 18 32.1 19 28.2 20.9 C26.5 21.7 25 22.4 24.9 22.4 C24.8 22.4 24.3 22.7 23.7 23 C23.1 23.4 22.2 23.9 21.6 24.1 C21 24.4 20.3 24.7 20 24.9 L19.6 25.3 L19.6 31.9 C19.6 39.8 19.3 38.8 21.9 40.5 C23 41.3 24.7 42.6 25.6 43.2 C28.8 45.6 32.2 48.1 32.5 48.1 C32.5 48.1 32.7 48 32.9 48 Z M42.2 47 C43.6 46.7 45.9 46.3 47.2 46 C48.5 45.8 49.7 45.5 50 45.4 C50.7 45 52.2 40.6 52.8 37 C52.9 36.4 53.1 35.3 53.2 34.6 C53.8 31 52.6 22.5 51.3 21.2 C51 20.9 49.2 20.5 45.3 19.7 C43.5 19.4 41.7 19 41.3 18.9 C39.9 18.7 39.8 18.8 40.3 21.3 C40.5 22.4 40.8 23.8 40.9 24.3 C41.7 28.9 40.3 39.5 38.1 45.5 C37.1 48.1 36.9 48 42.2 47 Z M56.9 44.3 C59 43.9 61.7 43.4 64.1 43 C67.1 42.5 67.1 42.4 67.4 41.7 C67.8 41 68.4 38.7 68.6 37 C68.7 36.3 68.9 35.2 69 34.6 C69.2 33.1 69 28.8 68.5 26.3 C68.2 25.1 67.9 24.8 66.6 24.5 C66 24.4 63.7 23.8 61.4 23.3 C55.1 21.7 55.4 21.7 55.9 24 C56.7 27.9 56.8 30.1 56.5 34.2 C56.3 37.2 56.1 38.3 55.3 41.1 C54.3 45 54.2 44.8 56.9 44.3 Z M73.9 41.2 C74.8 41 76.2 40.8 76.9 40.7 C79.4 40.3 82.6 39.6 83 39.4 C84 38.9 84.7 34.8 84.3 31 C84.1 29.2 83.8 28.4 83.2 28.3 C82.9 28.3 81.7 28 80.5 27.7 C72.9 26 72.5 25.9 72.2 26.2 C72 26.4 72 26.5 72.1 27.1 C72.4 28 72.4 35.9 72.1 37.3 C72 37.8 71.8 38.8 71.7 39.4 C71.2 41.7 71.2 41.8 73.9 41.2 Z M88.9 37.6 C90.7 35.7 90.9 32.1 89.2 30.6 C87.9 29.5 87.8 29.7 87.7 33.6 C87.7 35.3 87.6 37.1 87.5 37.5 C87.3 38.5 88 38.6 88.9 37.6 Z M15.7 19.8 C18.1 18.7 18.6 15.5 16.7 13.6 C15.4 12.3 13.7 12.1 11.9 13 C7.2 15.4 10.9 21.9 15.7 19.8 Z"/><path id="wi-windy-variant-2" d="M52.1 70.2 C51.3 69.4 51.5 68.3 52.6 67.8 C53.1 67.6 55.5 67.6 67.2 67.6 L81.2 67.6 L82.8 67.1 C91 64.7 91.5 53.3 83.4 51.2 C78.4 49.9 74.7 57 79.3 59.1 C82.1 60.3 80.4 62.9 76.3 63.8 C74.5 64.2 43.1 63.9 42.5 63.5 C41.6 62.9 41.7 61.8 42.6 61 L43.2 60.5 L59.1 60.5 C76.4 60.5 75.6 60.6 74.9 59.6 C70.4 52.6 79 45.1 87.1 49.1 C95.1 53.1 94 66.5 85.5 69.7 C82.4 70.8 83.3 70.7 67.3 70.7 L52.6 70.7 L52.1 70.2 Z"/><filter id="wi-windy-variant-b1" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="3.0"/></filter><filter id="wi-windy-variant-b2" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="1.2"/></filter></defs><g><g filter="url(#wi-windy-variant-b2)" opacity=".55"><g transform="translate(-1.15 -1.15) scale(1.0256)"><use href="#wi-windy-variant-0" fill="var(--wi-1, #4b28ff)" stroke-width="1.46"/><use href="#wi-windy-variant-1" fill="var(--wi-1, #4b28ff)" stroke-width="1.46"/><use href="#wi-windy-variant-2" fill="var(--wi-1, #4b28ff)" stroke-width="1.46"/></g></g><g filter="url(#wi-windy-variant-b1)" opacity=".9"><g transform="translate(-1.15 -1.15) scale(1.0256)"><use href="#wi-windy-variant-0" fill="var(--wi-1, #4b28ff)" stroke-width="1.46"/><use href="#wi-windy-variant-1" fill="var(--wi-1, #4b28ff)" stroke-width="1.46"/><use href="#wi-windy-variant-2" fill="var(--wi-1, #4b28ff)" stroke-width="1.46"/></g></g><g fill="#fff"><g transform="translate(-1.15 -1.15) scale(1.0256)"><use href="#wi-windy-variant-0" stroke="var(--wi-1, #4b28ff)" stroke-width="1.46"/><use href="#wi-windy-variant-1" stroke="var(--wi-1, #4b28ff)" stroke-width="1.46"/><use href="#wi-windy-variant-2" stroke="var(--wi-1, #4b28ff)" stroke-width="1.46"/></g></g><animateTransform attributeName="transform" type="rotate" additive="sum" values="-2.20 14.0 20.0; 2.20 14.0 20.0; -2.20 14.0 20.0" dur="4.00s" begin="0.00s" repeatCount="indefinite" calcMode="spline" keyTimes="0;0.5;1" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/></g>`,
 };
 // <<< ICONS_COMPOSE
+// Repli pour une condition inconnue (unknown/unavailable) : l'icone nuage d'origine.
 const ICONS = {
-  'sunny': () => _sun(50, 48, 1),
-  'clear-night': () => `<path d="M62 32 A22 22 0 1 0 68 70 A18 18 0 1 1 62 32 Z" fill="rgba(0,144,255,.10)" stroke="${GCY}" stroke-width="2.5" stroke-linejoin="round"/>
-    ${[...Array(3)].map((_, i) => `<circle cx="${30 + i * 8}" cy="${30 + i * 6}" r="1.4" fill="#fff"><animate attributeName="opacity" values="1;.2;1" dur="${2 + i}s" repeatCount="indefinite"/></circle>`).join('')}`,
-  'partlycloudy': () => `${_sun(38, 36, .62)}${_cloud(GCY, 8, 14, .85)}`,
-  'partlycloudy-night': () => `<path d="M44 30 A14 14 0 1 0 48 54 A11 11 0 1 1 44 30 Z" fill="none" stroke="${GCY}" stroke-width="2.5" stroke-linejoin="round"/>${_cloud(GCY, 8, 14, .85)}`,
   'cloudy': () => `<g style="animation:wdrift 6s ease-in-out infinite">${_cloud(GCY, -4, -2)}</g><g style="animation:wdrift 8s ease-in-out infinite" opacity=".55">${_cloud(GGREY, 8, 8, .7, 'rgba(126,140,160,.10)')}</g>`,
-  'rainy': () => `${_cloud(GCY, 0, -6)}${_drops(GCY, 60, 4)}`,
-  'rainy-night': () => `${_cloud(GCY, 0, -6)}${_drops(GCY, 60, 4)}`,
-  'pouring': () => `${_cloud(GCY, 0, -8)}${_drops(GCY, 58, 6, 30)}`,
-  'lightning': () => `${_cloud(GVIO, 0, -8, 1, 'rgba(122,77,255,.12)')}${_bolt(YEL)}`,
-  'lightning-rainy': () => `${_cloud(GVIO, 0, -10, 1, 'rgba(122,77,255,.12)')}${_bolt(YEL)}${_drops(GCY, 60, 3, 32)}`,
-  'snowy': () => `${_cloud(GCY, 0, -6)}${[...Array(4)].map((_, i) => _flake(34 + i * 11, 60, GCY, 2.4 + (i % 3) * 0.3, i * 0.35)).join('')}`,
-  'snowy-rainy': () => `${_cloud(GCY, 0, -6)}<line x1="40" y1="60" x2="40" y2="70" stroke="${GCY}" stroke-width="2.5" stroke-linecap="round"><animate attributeName="opacity" values="0;1;0" dur="1s" repeatCount="indefinite"/></line>${_flake(58, 60, GCY, 2.6, 0.3)}`,
-  'hail': () => `${_cloud(GCY, 0, -6)}${[...Array(4)].map((_, i) => `<circle cx="${34 + i * 11}" cy="64" r="2.4" fill="none" stroke="${WHT}" stroke-width="1.6"><animate attributeName="cy" values="60;72" dur="0.9s" begin="${i * 0.2}s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;1;0" dur="0.9s" begin="${i * 0.2}s" repeatCount="indefinite"/></circle>`).join('')}`,
-  'fog': () => `${_cloud(GCY, 0, -10, .9)}${[...Array(3)].map((_, i) => `<line x1="26" y1="${60 + i * 7}" x2="74" y2="${60 + i * 7}" stroke="${GGREY}" stroke-width="2.5" stroke-linecap="round" opacity=".7"><animateTransform attributeName="transform" type="translate" values="-6 0;6 0;-6 0" dur="${3 + i}s" repeatCount="indefinite"/></line>`).join('')}`,
-  'windy': () => `${[...Array(3)].map((_, i) => `<path d="M22 ${40 + i * 12} h${36 - i * 4} a6 6 0 1 ${i % 2} -6 6" fill="none" stroke="${GCY}" stroke-width="2.5" stroke-linecap="round"><animateTransform attributeName="transform" type="translate" values="0 0;6 0;0 0" dur="${2.5 + i * 0.5}s" repeatCount="indefinite"/></path>`).join('')}`,
-  'windy-variant': () => `${[...Array(3)].map((_, i) => `<path d="M22 ${40 + i * 12} h${36 - i * 4} a6 6 0 1 ${i % 2} -6 6" fill="none" stroke="${GVIO}" stroke-width="2.5" stroke-linecap="round"><animateTransform attributeName="transform" type="translate" values="0 0;6 0;0 0" dur="${2.5 + i * 0.5}s" repeatCount="indefinite"/></path>`).join('')}`,
-  'exceptional': () => `<circle cx="50" cy="50" r="30" fill="none" stroke="${GVIO}" stroke-width="2.5"/><line x1="50" y1="34" x2="50" y2="56" stroke="${YEL}" stroke-width="4" stroke-linecap="round"/><circle cx="50" cy="66" r="2.6" fill="${YEL}"><animate attributeName="opacity" values="1;.2;1" dur="1.4s" repeatCount="indefinite"/></circle>`,
 };
 // Retire les animations SVG SMIL (<animate>, <animateTransform>, <animateMotion>) —
 // le CSS animation:none ne les coupe PAS. Sur iPad/mobile → icônes figées (statiques).
@@ -806,7 +775,7 @@ const GLITCH_PATH = "M15.724 15.662h5.454v5.454h5.455v-5.454h5.457v-5.455h5.455v
 function glitchAccessory(cond) {
   if (['sunny'].includes(cond))
     return `<rect x="13" y="22" width="9" height="4.5" rx="1.5" fill="#0b0b0b"/><rect x="29" y="22" width="9" height="4.5" rx="1.5" fill="#0b0b0b"/><rect x="22" y="23.4" width="7" height="1.6" fill="#0b0b0b"/>`; // lunettes
-  if (['rainy', 'pouring', 'snowy-rainy'].includes(cond))
+  if (['rainy', 'rainy-night', 'pouring', 'snowy-rainy'].includes(cond))
     return `<path d="M9 8 h33 v2 h-33 z" fill="#ffe14d"/><path d="M25.5 8 v-5" stroke="#ffe14d" stroke-width="2"/><path d="M13 8 q12.5 -11 24 0" fill="none" stroke="#ffe14d" stroke-width="2"/>`; // parapluie
   if (STORM_CONDS.has(cond))
     return `<polygon points="44,1 38,12 42.5,12 37,21 47,9.5 42.5,9.5 46,1" fill="#ffe14d"/>`; // éclair
@@ -821,7 +790,7 @@ function glitchMood(cond, o = {}) {
   if (cond === 'fog') return 'wcat-fog';
   return '';
 }
-const GLITCH_ACTIVE = new Set(['rainy', 'pouring', 'snowy', 'snowy-rainy', 'hail', 'lightning', 'lightning-rainy']);
+const GLITCH_ACTIVE = new Set(['rainy', 'rainy-night', 'pouring', 'snowy', 'snowy-rainy', 'hail', 'lightning', 'lightning-rainy']);
 // génère le bloc GLITCH (3 calques rouge/cyan/principal en screen → aberration RGB).
 // mainColor = couleur du calque principal : vert plasma au repos, ou couleur de
 // vigilance (jaune/orange/rouge) quand une alerte est active → GLITCH "s'alarme".
@@ -904,7 +873,9 @@ function starRng(a) {
 // Graine par JOUR : ciel différent chaque nuit (« on se lasse pas »), mais stable
 // pendant toute la nuit. Une graine par montage ferait sauter le semis au moindre
 // re-render ; Math.random() le ferait plusieurs fois par minute.
-function starSeed() { return Math.floor(Date.now() / 864e5) * 2654435761; }
+// Le jour bascule a midi LOCAL (heure locale decalee de 12 h) : minuit UTC tombait en
+// pleine nuit (01h-02h en France) et le ciel changeait sous les yeux.
+function starSeed() { return Math.floor((Date.now() - new Date().getTimezoneOffset() * 6e4 - 432e5) / 864e5) * 2654435761; }
 
 // Constantes ajustées visuellement : ne pas les « arrondir ».
 const STARS = {
@@ -1058,15 +1029,17 @@ const DAYS_FR = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
 //   → "Saint-Jean-de-Luz"
 function cleanLocationName(fn) {
   if (!fn) return null;
+  const orig = String(fn).trim();
+  if (!orig) return null;
   // cas Météo-France : "... for city XXX - Région ..." → on prend XXX.
   // On coupe sur " - " (tiret ENTOURÉ d'espaces) pour ne PAS casser les tirets
   // internes du nom (ex. Saint-Jean-de-Luz).
-  let m = fn.match(/for city\s+(.+?)\s+[-–]\s+/i);
-  if (m) return m[1].trim();
+  let m = orig.match(/for city\s+(.+?)\s+[-–]\s+/i);
+  if (m && m[1].trim()) return m[1].trim();
   // sinon, retire les préfixes de provider connus puis coupe sur " - "
-  let s = fn.replace(/^.*?forecast\s+(for\s+)?/i, '').trim();
+  let s = orig.replace(/^.*?forecast\s+(for\s+)?/i, '').trim();
   s = s.split(/\s+[-–]\s+/)[0].trim();
-  return s || fn;
+  return s || orig;   // jamais vide : repli sur le nom d'origine
 }
 
 // ═══════════════════════════════════════════════════════
@@ -1260,7 +1233,7 @@ const _EN = {
  "Nuageux": "Cloudy",
  "Nuit claire": "Clear night",
  "Nuit d'après la luminosité 🌙": "Night from illuminance 🌙",
- "Nuit déduite du soleil (sinon lux)": "Night from sun (else lux)",
+ "Jour/nuit recalculé (lux, repli soleil)": "Day/night recomputed (lux, sun fallback)",
  "Nuit nuageuse": "Cloudy night",
  "Nuit — plancher opacité": "Night — opacity floor",
  "Nuit — portée du halo": "Night — halo reach",
@@ -1303,6 +1276,7 @@ const _EN = {
  "Pluie nocturne": "Night rain",
  "Pluie sur vitre": "Rain on glass",
  "Pluie-inondation": "Rain/flood",
+ "Pollens": "Pollen",
  "Pollens (J+1)": "Pollen (D+1)",
  "Pollens (jour)": "Pollen (today)",
  "Pollens — aujourd'hui": "Pollen — today",
@@ -1314,6 +1288,7 @@ const _EN = {
  "Profondeur (écart des plans)": "Depth (layer spacing)",
  "Prévisions & affichage": "Forecast & display",
  "Pulsation": "Pulse",
+ "Qualité de l'air": "Air quality",
  "Qualité air (J+1)": "Air quality (D+1)",
  "Qualité air (jour)": "Air quality (today)",
  "Qualité de l'air — aujourd'hui (Atmo France)": "Air quality — today (Atmo France)",
@@ -1366,6 +1341,10 @@ const _EN = {
  "Vent — déformation": "Wind — distortion",
  "Vent — teinte": "Wind — hue",
  "Vent — tourbillon": "Wind — swirl",
+ "Température": "Temperature",
+ "Par jour": "Daily",
+ "Par heure": "Hourly",
+ "Deux fois par jour": "Twice daily",
  "Vent — turbulence": "Wind — turbulence",
  "Venteux": "Windy",
  "Vert": "Green",
@@ -1394,22 +1373,17 @@ const _setLang = (h) => {
 };
 
 class WeatherNeonCardWebgl extends HTMLElement {
-  // px : marge entre le bas des effets 2D et le trait des previsions.
-  // A ZERO. La pluie de fond s'arretait DEJA pile sur le
-  // trait (dernier pixel de trait a 112 pour un divider a 118) ; un A/B a 0 / 5 / 20 px
-  // sur la meme frame ne montre AUCUNE difference visible -- la vitre du shader couvre
-  // toute la card et noie la frontiere. Le curseur reste ici, il ne sert juste a rien.
-  static FX_GAP = 0;
-
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });  // CSS encapsulé → ne touche JAMAIS le thème
     this._built = false;
+    this._fitGen = 0;   // generation de mise en page, cf _fitCanvas
   }
 
   setConfig(config) {
     if (!config.entity) throw new Error('weather-neon-card : "entity" est requis (weather.*)');
     this._config = buildConfig(config);
+    this._fitGen++;   // classes/options de mise en page possiblement changees
     this._forecast = null;
     this._fcUnsub();
     this._lastHtml = null;
@@ -1518,6 +1492,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
   // Construit le squelette UNE fois (style + ha-card) dans le shadowRoot.
   // CSS encapsulé → @keyframes et classes ne fuient PAS vers le thème.
   _build() {
+    this._fitGen++;
     this.shadowRoot.innerHTML = `
       <style>${WeatherNeonCardWebgl.styles}</style>
       <div class="wscale"><ha-card>
@@ -1575,7 +1550,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // `_fxCapable` REMPLACE `this._fxGl` la ou le code testait la VARIANTE (suis-je
     // la card -webgl ?) et non le contexte vivant : ce test devenait faux en lazy,
     // ce qui aurait desarme _rainGlassOnly (les gouttes) et la neige GL.
-    this._fxCapable = !!this._config.fx_gl;
+    this._fxCapable = !!this._config.fx_gl && !this._fxGlBroken;
     this._fxGlEnsure();
     this._elFrost = this.shadowRoot.querySelector('.wfrost-canvas');
     this._elFlash = this.shadowRoot.querySelector('.wflash');
@@ -1600,14 +1575,24 @@ class WeatherNeonCardWebgl extends HTMLElement {
     });
 
     // Délégation de clic → more-info HA (pastilles Atmo + température). Posé 1x.
-    this._elInner.addEventListener('click', e => {
-      const el = e.target.closest('[data-atmo],[data-t]');
-      if (!el) return;
+    const moreInfo = el => {
       const entityId = el.getAttribute('data-atmo') || this._config.entity;
       if (!entityId) return;
       this.dispatchEvent(new CustomEvent('hass-more-info', {
         detail: { entityId }, bubbles: true, composed: true,
       }));
+    };
+    this._elInner.addEventListener('click', e => {
+      const el = e.target.closest('[data-atmo],[data-t]');
+      if (el) moreInfo(el);
+    });
+    // Clavier : seuls les elements marques role=button (donc focusables) s'activent.
+    this._elInner.addEventListener('keydown', e => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const el = e.target.closest('[role="button"][data-atmo],[role="button"][data-t]');
+      if (!el) return;
+      e.preventDefault();   // Espace ne doit pas faire defiler la page
+      if (!e.repeat) moreInfo(el);
     });
 
     this._observeSize();
@@ -1620,6 +1605,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._ro) this._ro.disconnect();
     const card = this._elCard;
     this._ro = new ResizeObserver(() => {
+      this._fitGen++;   // immediat (pas apres le debounce) : les boucles relisent la taille
       // l'echelle EN PREMIER : elle fixe la largeur de mise en page de ha-card,
       // dont dependent et la mesure de la zone hero et le refit des canvas.
       this._applyScale();
@@ -1675,10 +1661,17 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._avrilStop(); this._avrilOn = false;
     clearTimeout(this._frostReflow); this._frostReflow = null;
     this._fxFlakes = null; this._fxFlakeKey = null; this._fxSnowLast = 0;
-    for (const k of ['_fxRAF', '_frostRAF', '_heatRAF']) if (this[k]) { cancelAnimationFrame(this[k]); this[k] = null; }
+    for (const k of ['_fxRAF', '_frostRAF', '_heatRAF', '_frostRetry']) if (this[k]) { cancelAnimationFrame(this[k]); this[k] = null; }
     for (const k of ['_glitchTimer', '_stormTimer', '_nightTimer', '_clockTimer']) if (this[k]) { clearTimeout(this[k]); this[k] = null; }
     for (const k of ['_ro', '_fxIO']) if (this[k]) { this[k].disconnect(); this[k] = null; }
     this._bolt = null;
+    // minuteries memorisees (_later) annulees : on remet aussi a zero ce qu'elles auraient
+    // retire, sinon le DOM interne conserve (meme _lastHtml) un etat transitoire fige
+    if (this._tmos) { for (const t of this._tmos) clearTimeout(t); this._tmos.clear(); }
+    if (this._elFlash) this._elFlash.style.opacity = 0;
+    if (this._elFx) for (const s of this._elFx.querySelectorAll('.wshoot')) s.remove();
+    const cat = this._elInner && this._elInner.querySelector('.wcat');
+    if (cat) cat.classList.remove('wcat-pop', 'wcat-blink', 'wcat-do-nod', 'wcat-do-wink', 'wcat-do-vib');
     this._frostOn = false; this._frostSegs = null;  // forcera la re-croissance à la reconnexion
     this._renderSnap = null;  // force un render complet à la reconnexion → relance les moteurs
     // /!\ REARMER la visibilite. `_fxIO` vient d'etre detruit juste au-dessus ; s'il
@@ -1692,6 +1685,11 @@ class WeatherNeonCardWebgl extends HTMLElement {
   // ── Dimensionne un canvas overlay (fallback ha-card si le layout n'est pas prêt).
   //    Partagé par le moteur FX et le givre (avant : 4 copies quasi identiques).
   _fitCanvas(cv) {
+    const dpr = WNC_IS_LOW_POWER ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+    // Pas de lecture de mise en page (offset* force un layout) tant que rien n'a pu
+    // changer : _fitGen est incremente par le ResizeObserver, le (re)montage, setConfig
+    // et toute reecriture du DOM interne. Le DPR se relit sans cout.
+    if (cv._fitGen === this._fitGen && cv._w && cv._h && cv._dpr === dpr) return true;
     // offset* et PAS getBoundingClientRect() : le wrapper .wscale porte un
     // transform:scale(), et le rect le refleterait -> canvas refitte a la
     // taille visuelle alors qu'il est dessine en coordonnees de reference.
@@ -1701,11 +1699,11 @@ class WeatherNeonCardWebgl extends HTMLElement {
       if (card) { w = w || card.offsetWidth; h = h || card.offsetHeight; }
     }
     if (!w || !h) return false;
-    const dpr = WNC_IS_LOW_POWER ? 1 : Math.min(window.devicePixelRatio || 1, 2);
     if (cv._w !== w || cv._h !== h || cv._dpr !== dpr) {
       cv.width = w * dpr; cv.height = h * dpr;
       cv._w = w; cv._h = h; cv._dpr = dpr;
     }
+    cv._fitGen = this._fitGen;
     return true;
   }
 
@@ -1739,22 +1737,12 @@ class WeatherNeonCardWebgl extends HTMLElement {
     this._fxIO.observe(this);
   }
 
-  // Relance les boucles desarmees par la sortie d'ecran. La variante WebGL
-  // surcharge ce point d'entree pour y rajouter le ciel.
-  _loopsResume() {
-    if (this._elFxCv) this._ensureFxLoop();
-  }
-
   _ensureFxLoop() {
     const cv = this._elFxCv;
     if (!cv) return;
     this._ensureVisIO();
     // pools créés une fois
-    if (!this._windSheets) {
-      this._windSheets = [...Array(4)].map((_, i) => ({
-        t: Math.random() * 1000, y: 0.18 + i * 0.21, speed: 0.5 + Math.random() * 0.5,
-        amp: 6 + Math.random() * 10, len: 0.5 + Math.random() * 0.4, thick: 16 + Math.random() * 22,
-      }));
+    if (!this._windParts) {
       this._windParts = [...Array(40)].map(() => ({ reset: true }));
       this._rainDrops = []; this._rainSplash = [];
     }
@@ -1822,47 +1810,15 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._fxGl) this._fxGlDraw(now);
   }
 
-  // ── VENT : nappes de brume soufflée + particules portées. Densité/vitesse ∝
+  // ── VENT : particules portées par le flux. Densité/vitesse ∝
   //    this._windForce (km/h). Rien sous ~12 km/h (garanti par _windOn).
   _drawWind(ctx, W, H) {
     const force = this._windForce || 0;
-    const intensity = Math.min((force - 12) / 38, 1);  // 0→1
+    // borne basse : fx_vent_toujours force l'effet sous 12 km/h, sans quoi vitesse negative
+    const intensity = Math.max(0, Math.min((force - 12) / 38, 1));  // 0→1
     const speed = 0.4 + intensity * 1.4;               // vitesse globale du flux
 
-    // 1) NAPPES de brume : bandes horizontales ondulées, gradient doux, dérivent.
-    // DESACTIVEES (bande grise / bord dur) — code garde intact,
-    // boucle simplement sautee via nSheets=0. Particules (partie 2 ci-dessous) toujours actives.
-    const nSheets = false ? (WNC_IS_LOW_POWER ? 1 : 2 + Math.round(intensity * 2)) : 0;  // 1 (tablette) / 2-4
-    for (let s = 0; s < nSheets; s++) {
-      const sh = this._windSheets[s];
-      sh.t += speed * sh.speed;
-      const cy = sh.y * H;
-      // Le degrade doit couvrir l'extent REEL rempli (cy -> cy+thick), pas cy-thick -> cy+thick :
-      // sinon la moitie fade-in (cy-thick -> cy) n'est jamais dessinee et la nappe demarre
-      // a alpha MAX des sa premiere ligne -- bord dur en haut.
-      const grad = ctx.createLinearGradient(0, cy, 0, cy + sh.thick);
-      grad.addColorStop(0, 'rgba(150,210,255,0)');
-      grad.addColorStop(0.5, `rgba(170,225,255,${(0.05 + intensity * 0.07).toFixed(3)})`);
-      grad.addColorStop(1, 'rgba(150,210,255,0)');
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.moveTo(-20, cy);
-      const seg = 40; // etait 10 : facettes visibles sur le contour sinusoidal a cette echelle
-      const step = sh.len * 10 / seg; // garde la meme frequence de vague qu'avant le bump de seg
-      for (let i = 0; i <= seg; i++) {
-        const x = -20 + (W + 40) * (i / seg);
-        const y = cy + Math.sin(sh.t * 0.04 + i * step) * sh.amp;
-        ctx.lineTo(x, y);
-      }
-      for (let i = seg; i >= 0; i--) {
-        const x = -20 + (W + 40) * (i / seg);
-        const y = cy + Math.sin(sh.t * 0.04 + i * step) * sh.amp + sh.thick;
-        ctx.lineTo(x, y);
-      }
-      ctx.closePath(); ctx.fill();
-    }
-
-    // 2) PARTICULES portées par le flux (poussières/feuilles) — petites traînées.
+    // PARTICULES portées par le flux (poussières/feuilles) — petites traînées.
     const resetPart = (p) => {
       p.x = -8 - Math.random() * 40;
       p.y = Math.random() * H;
@@ -2010,16 +1966,26 @@ class WeatherNeonCardWebgl extends HTMLElement {
   _glitchBlink() {
     const c = this._config;
     const cat = c.glitch && this._elInner && this._elInner.querySelector('.wcat');
-    if (!cat || this.classList.contains('w-narrow')) return;
+    if (!cat || this._elInner.classList.contains('w-narrow')) return;
     let wait = c.fx_glitch_clin_delai;
     if (!cat.classList.contains('wcat-pop') && !cat.classList.contains('wcat-out')) {
       if (this._glitchPop) this._glitchPop();
       wait += 520;
     }
-    setTimeout(() => {
+    this._later(() => {
+      if (!cat.isConnected) return;
       cat.classList.add('wcat-blink');
-      setTimeout(() => cat.classList.remove('wcat-blink'), c.fx_glitch_clin_duree);
+      this._later(() => cat.classList.remove('wcat-blink'), c.fx_glitch_clin_duree);
     }, wait);
+  }
+
+  // setTimeout memorise : tous les ids sont annules en bloc par disconnectedCallback,
+  // un callback ne tourne donc jamais sur un element detache.
+  _later(fn, ms) {
+    if (!this._tmos) this._tmos = new Set();
+    const id = setTimeout(() => { this._tmos.delete(id); fn(); }, ms);
+    this._tmos.add(id);
+    return id;
   }
 
   _drawBolt(ctx, W, H, now) {
@@ -2083,7 +2049,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     s.className = 'wshoot';
     s.style.cssText = `left:${(5 + Math.random() * 55).toFixed(0)}%;top:${(6 + Math.random() * 30).toFixed(0)}%;--sa:${(16 + Math.random() * 16).toFixed(0)}deg`;
     fx.appendChild(s);
-    setTimeout(() => s.remove(), 1000);
+    this._later(() => s.remove(), 1000);
   }
 
   // ── GIVRE : cristaux fractals (dendrites) qui poussent depuis les 4 coins vers le
@@ -2094,8 +2060,14 @@ class WeatherNeonCardWebgl extends HTMLElement {
   _startFrost() {
     const cv = this._elFrost;
     if (!cv) return;
+    if (this._frostRetry) { cancelAnimationFrame(this._frostRetry); this._frostRetry = null; }
     if (!this._fitCanvas(cv)) {                 // layout pas prêt → re-tente au prochain frame
-      requestAnimationFrame(() => this._startFrost());
+      // id memorise (annule par _clearFrost / disconnectedCallback), jamais deux armes,
+      // et pas de relance si le givre n'est plus demande.
+      this._frostRetry = requestAnimationFrame(() => {
+        this._frostRetry = null;
+        if (this._frostOn) this._startFrost();
+      });
       return;
     }
     const W = cv._w, H = cv._h;
@@ -2136,7 +2108,13 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (this._frostRAF) cancelAnimationFrame(this._frostRAF);
     const dpr = cv._dpr, segs = this._frostSegs;
     const DUR = 2500, start = performance.now();
+    // plafond 30 fps (15 en low-power) : la progression reste calee sur le temps ecoule,
+    // seul le nombre de redessins baisse. La frame finale (k=1) n'est jamais sautee.
+    const minDt = WNC_IS_LOW_POWER ? 66 : 33;
+    let lastDraw = -1e9;
     const render = (now) => {
+      if (now - start < DUR && now - lastDraw < minDt) { this._frostRAF = requestAnimationFrame(render); return; }
+      lastDraw = now;
       const k = Math.min(1, (now - start) / DUR);
       const e = 1 - Math.pow(1 - k, 3);                 // ease-out cubic
       const ctx = cv.getContext('2d');
@@ -2163,6 +2141,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
   // Efface le givre (transition gel→sec)
   _clearFrost() {
     if (this._frostRAF) { cancelAnimationFrame(this._frostRAF); this._frostRAF = null; }
+    if (this._frostRetry) { cancelAnimationFrame(this._frostRetry); this._frostRetry = null; }
     const cv = this._elFrost;
     if (cv && cv._w) cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
   }
@@ -2177,6 +2156,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const minDt = WNC_IS_LOW_POWER ? 66 : 33;    // 15 fps Companion / 30 fps PC
     const start = performance.now();
     const draw = (now) => {
+      // hors ecran : on desarme au lieu de re-armer (relance par _loopsResume)
+      if (this._fxOff) { this._heatRAF = null; return; }
       this._heatRAF = requestAnimationFrame(draw);
       if (document.hidden) return;
       if (now - (this._heatLast || 0) < minDt) return;
@@ -2236,15 +2217,9 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // on divise par k pour revenir dans ce repere, sinon la zone hero retrecit
     // une seconde fois et les effets s'arretent trop haut.
     const k = this._scaleK || 1;
-    // FX_GAP : on s'arrete quelques pixels AVANT le trait des previsions, pas dessus.
-    // --fx-h valait exactement le haut de .wforecast, or le
-    // trait EST son ::before en top:0 -- la pluie mourait donc pile sur la ligne, et
-    // les deux traits se disputaient le meme pixel. Un retrait laisse respirer le
-    // divider et rend la coupure moins franche. Vaut aussi pour .wflash et le halo
-    // ::before, qui lisent le meme --fx-h : toute la zone hero recule ensemble.
+    // --fx-h = haut de .wforecast ; vaut aussi pour .wflash et le halo ::before.
     const h = Math.round(
-      (fcEl.getBoundingClientRect().top - this._elCard.getBoundingClientRect().top) / k)
-      - WeatherNeonCardWebgl.FX_GAP;
+      (fcEl.getBoundingClientRect().top - this._elCard.getBoundingClientRect().top) / k);
     if (h <= 0 || h === this._fxH) return;      // layout pas pret, ou rien n'a bouge
     this._elCard.style.setProperty('--fx-h', h + 'px');
     this._fxH = h;
@@ -2263,13 +2238,21 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // FX GL : _fxGlEnsure decide (ouvre si un effet est actif, ferme sinon). Avant,
     // ce `if` rouvrait le contexte a CHAQUE rendu des que fx_gl etait active, ce qui
     // aurait annule le lazy-init du montage.
-    this._fxCapable = !!this._config.fx_gl;
+    this._fxCapable = !!this._config.fx_gl && !this._fxGlBroken;
     this._fxGlEnsure();
     // l'aurore, elle, n'est pas rearmee ici : c'est le verdict (_aurEnsure) qui
     // decide, et il repasse a chaque _render.
 
     const st = this._hass.states[this._config.entity];
-    if (!st) { this._elInner.innerHTML = `<div style="padding:16px">${_t('Entité introuvable :')} ${escHtml(this._config.entity)}</div>`; return; }
+    if (!st) {
+      // snap/_lastHtml remis a null : au retour de l'entite le rendu identique ne doit
+      // pas etre court-circuite, sinon le message reste affiche.
+      this._renderSnap = null; this._lastHtml = null;
+      const miss = `<div style="padding:16px">${_t('Entité introuvable :')} ${escHtml(this._config.entity)}</div>`;
+      if (this._missHtml !== miss) { this._elInner.innerHTML = miss; this._missHtml = miss; this._fitGen++; }
+      return;
+    }
+    this._missHtml = null;
 
     // Dirty-check : HA pousse `set hass` plusieurs fois/seconde. On ne re-render que
     // si un état PERTINENT a changé (sinon : centaines de recalculs/RAF inutiles =
@@ -2289,6 +2272,26 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // température = attribut (pas l'état) → l'ajouter au snapshot, sinon le givre (seuil
     // sur la temp) ne se déclencherait pas quand seule la temp change.
     snap += '|t=' + (S[this._config.entity]?.attributes?.temperature ?? '');
+    // attributs de l'entite meteo AFFICHES (pastilles humidite/vent/pression/rafales,
+    // unites, nom) : leur changement seul (l'etat `state` restant identique) doit re-rendre.
+    {
+      const wa = st.attributes || {};
+      snap += '|a=' + [wa.friendly_name, wa.temperature_unit, wa.humidity, wa.pressure, wa.pressure_unit,
+        wa.wind_speed, wa.wind_gust_speed, wa.wind_speed_unit].map(v => v ?? '').join(',');
+      // vigilance : computeVigilance lit un attribut par risque
+      const al = this._config.alert_entity && S[this._config.alert_entity];
+      if (al && al.attributes) snap += '|al=' + VIGI_RISKS.map(r => al.attributes[r] ?? '').join(',');
+      // pastilles Atmo : libelle/couleur sont des attributs (attrByPrefix), pas l'etat
+      if (this._config.show_atmo) {
+        for (const e of [this._config.air_entity, this._config.pollen_entity]) {
+          const s = e && S[e];
+          if (s) snap += '|at=' + (attrByPrefix(s.attributes, 'Libell') ?? '') + ',' + (attrByPrefix(s.attributes, 'Couleur') ?? '');
+        }
+      }
+      // colonne droite : lever/coucher = attributs de sun.sun
+      const sn = this._config.show_aside && S[this._config.sun_entity];
+      if (sn && sn.attributes) snap += '|su=' + (sn.attributes.next_rising ?? '') + ',' + (sn.attributes.next_setting ?? '');
+    }
     snap += '|fc=' + (this._forecast ? this._forecast.length : 0) + ':' + (this._fcTs || 0);
     // On snapshote le VERDICT nuit, pas la valeur en lux : les lux bougent en continu et
     // re-rendraient la card à chaque mesure, alors que le verdict ne change que 2×/jour.
@@ -2307,7 +2310,13 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const a = st.attributes;
     const name = this._config.name || cleanLocationName(a.friendly_name) || this._config.entity;
     const showName = this._config.show_name !== false;
-    const temp = Math.round(a.temperature);
+    // Math.round(null) vaut 0 (faux givre) : on ne convertit que nombre / chaine non vide, sinon NaN.
+    const tRaw = a.temperature;
+    const temp = (typeof tRaw === 'number' || (typeof tRaw === 'string' && tRaw.trim() !== '')) ? Math.round(tRaw) : NaN;
+    const tempTxt = Number.isFinite(temp) ? temp : '--';
+    // frost_below est en °C : en °F on convertit POUR LA COMPARAISON seulement
+    // (l'affichage garde l'unite de l'entite).
+    const tempC = (Number.isFinite(temp) && /f/i.test(String(a.temperature_unit || ''))) ? (temp - 32) * 5 / 9 : temp;
     const unit = escHtml(a.temperature_unit || '°C');
 
     // ACCENT PAR MÉTÉO : --wnc-acc sur ha-card ; sans l'option → retombe sur le thème
@@ -2367,10 +2376,13 @@ class WeatherNeonCardWebgl extends HTMLElement {
       `<span class="watmo watmo-stat"><span class="watmo-i">${MINI_ICONS[iconKey]}</span><b>${escHtml(v)}</b></span>`;
     const pUnit = a.pressure_unit || 'hPa';
     const windVal = ex.wind != null ? ex.wind : a.wind_speed;  // sensor externe prioritaire
+    const windU = (ex.wind != null ? ex.windUnit : a.wind_speed_unit) || 'km/h';
+    const windK = ex.wind != null ? ex.windK : windToKmh(a.wind_speed_unit);
     const c = this._config;
     const stats = [
       c.show_humidity ? statPill('humidity', a.humidity != null ? a.humidity + ' %' : null) : '',
-      c.show_wind     ? statPill('wind', windVal != null ? Math.round(windVal) + ' km/h' : null) : '',
+      // statPill echappe deja la valeur entiere (unite comprise) : pas de double escHtml
+      c.show_wind     ? statPill('wind', windVal != null ? Math.round(windVal) + ' ' + windU : null) : '',
       c.show_pressure ? statPill('pressure', a.pressure != null ? Math.round(a.pressure) + ' ' + pUnit : null) : '',
     ].join('');
 
@@ -2393,13 +2405,17 @@ class WeatherNeonCardWebgl extends HTMLElement {
       }
       // rafales : affichées SEULEMENT si > 0 (sinon doublon inutile avec le vent des stats)
       const gustVal = ex.gust != null ? ex.gust : a.wind_gust_speed;
+      const gustU = (ex.gust != null ? ex.gustUnit : a.wind_speed_unit) || 'km/h';
       if (gustVal != null && Math.round(gustVal) > 0) {
-        rows.push(`<div class="war"><span class="wari">${MINI_ICONS.gust}</span><b>${Math.round(gustVal)} km/h</b></div>`);
+        rows.push(`<div class="war"><span class="wari">${MINI_ICONS.gust}</span><b>${Math.round(gustVal)} ${escHtml(gustU)}</b></div>`);
       }
       if (rows.length) asideHtml = `<div class="waside">${rows.join('')}</div>`;
     }
 
     const tempCls = this._config.neon_fx ? 'wtemp wtemp-glitch' : 'wtemp';
+    // la temperature n'ouvre le more-info que si une entite est configuree
+    const tempA11y = this._config.entity
+      ? ` role="button" tabindex="0" aria-label="${_t('Température')} ${tempTxt}${unit}"` : '';
     // couleur de GLITCH = vigilance si alerte active, sinon vert plasma
     const catColor = vigi ? vigi.color : '#4AF2A1';
 
@@ -2427,8 +2443,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     const gc = this._config;
     this._glitchActive = GLITCH_ACTIVE.has(cond);
     const glitch = gc.glitch ? glitchHtml(cond, catColor, {
-      vent: Number(windVal) >= gc.fx_glitch_vent_seuil,
-      gel: !!gc.fx_givre_toujours || (Number.isFinite(temp) && temp <= gc.frost_below),
+      vent: Number(windVal) * windK >= gc.fx_glitch_vent_seuil,
+      gel: !!gc.fx_givre_toujours || (Number.isFinite(tempC) && tempC <= gc.frost_below),
       nuitDehors: gc.fx_glitch_nuit_dehors !== false,
       vars: `--plisse:${gc.fx_glitch_plisse};--eamp:${gc.fx_glitch_echarpe_amp}px;--edur:${gc.fx_glitch_echarpe_per}s;`
         + `--boule:${gc.fx_glitch_boule};--souffle:${gc.fx_glitch_souffle};--zs:${gc.fx_glitch_z_taille}px;`
@@ -2446,7 +2462,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
       ${clockHtml}
       <div class="whero">
         <div class="wicon">${iconSvg(cond, 70, haloColor)}</div>
-        <div class="${tempCls}" data-t="${temp}${unit}">${temp}<small>${unit}</small></div>
+        <div class="${tempCls}" data-t="${tempTxt}${unit}"${tempA11y}>${tempTxt}<small>${unit}</small></div>
         <div class="wnow">
           <div class="wcond">${escHtml(condLabel)}</div>
           ${vigi ? `<div class="wvigi" style="color:${vigi.color}">⚠ ${_t('Vigilance')} ${_t(Object.keys(VIGI_RANK)[vigi.rank])} — ${vigi.risks.map(r => _t(r)).join(', ')}</div>` : ''}
@@ -2463,6 +2479,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (inner !== this._lastHtml) {
       this._elInner.innerHTML = inner;
       this._lastHtml = inner;
+      this._fitGen++;   // la hauteur de la card a pu changer
       this._clockStart();
       this._startGlitchLife();  // (re)lance la vie de GLITCH sur le nouvel élément
       requestAnimationFrame(() => {
@@ -2473,7 +2490,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // ═══ MOTEUR FX : niveaux selon la condition, la boucle unique s'occupe du reste.
     const rainLevel = this._config.fx_pluie_toujours ? 1
       : cond === 'pouring' ? 1
-      : ['rainy', 'lightning-rainy'].includes(cond) ? 0.6
+      : ['rainy', 'rainy-night', 'lightning-rainy'].includes(cond) ? 0.6
       : cond === 'snowy-rainy' ? 0.4
       : (ex.rainCh >= 40 && this._config.particles) ? ex.rainCh / 100 * 0.4  // annonce forte → bruine
       : 0;
@@ -2504,7 +2521,8 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // WebGL) `_fxCapable` est `undefined` → faux : elle garde son averse, comme avant.
     this._rainGlassOnly = !!(this._fxCapable && this._config.fx_pluie > 0
       && cond !== 'pouring' && !STORM_CONDS.has(cond) && (ex.rainCh || 0) < 50);
-    this._windForce = Math.max(ex.gust || 0, ex.wind || 0);
+    // effets en km/h : on convertit d'apres l'unite reelle (inchange si km/h ou absente)
+    this._windForce = Math.max((ex.gust || 0) * ex.gustK, (ex.wind || 0) * ex.windK);
     this._windOn = fxOn && (this._windForce >= 12 || this._config.fx_vent_toujours);
     this._fogLevel = this._config.fx_brouillard_toujours ? 1 : (fxOn && cond === 'fog') ? 1 : 0;
     const snowLevel = this._config.fx_neige_toujours ? 1
@@ -2516,6 +2534,9 @@ class WeatherNeonCardWebgl extends HTMLElement {
     // alors que la card EST bien la variante -webgl. Tester le contexte vivant ici
     // aurait mis la neige GL a 0 tant qu'aucun effet n'etait deja actif -- soit jamais.
     this._fxSnowLvl = (fxOn && this._fxCapable) ? snowLevel : 0;
+    // L'appel de tete lit des niveaux (_rainLevel/_fogLevel/_windOn/_fxSnowLvl) du rendu
+    // precedent : on redemande ici, niveaux a jour, sans attendre le prochain rendu.
+    this._fxGlEnsure();
     if (this._rainLevel > 0 || this._windOn || this._fogLevel > 0 || this._fxSnowLvl > 0) this._ensureFxLoop();
 
     // ORAGE → éclairs ramifiés par rafales (one-shot, flash overlay piloté en même temps)
@@ -2611,12 +2632,16 @@ class WeatherNeonCardWebgl extends HTMLElement {
                                             this._fxSnowLvl > 0 ? 0 : ex.snowCh);
         this._fxKey = fxKey;
       }
+    } else if (this._fxKey) {
+      // particles passe a false en cours de route : on retire les particules CSS restantes
+      this._elFx.innerHTML = '';
+      this._fxKey = null;
     }
 
     // GIVRE (canvas) : cristaux quand temp ≤ frost_below. One-shot animé : on ne (re)lance
     // la croissance qu'au PASSAGE sec→gel (_frostOn), sinon chaque tick rejouerait l'anim.
     const frostNow = this._config.fx_givre_toujours || (this._config.frost && this._config.particles
-      && Number.isFinite(temp) && temp <= this._config.frost_below);
+      && Number.isFinite(tempC) && tempC <= this._config.frost_below);
     if (frostNow && !this._frostOn) { this._frostOn = true; this._startFrost(); }
     else if (!frostNow && this._frostOn) { this._frostOn = false; this._clearFrost(); }
 
@@ -2665,9 +2690,28 @@ class WeatherNeonCardWebgl extends HTMLElement {
       return isNaN(v) ? null : v;
     };
     const pick = (cfg, suffix) => num(cfg) ?? num(`sensor.${base}_${suffix}`);
+    // repli sur les attributs de l'entite meteo quand l'integration n'a pas de capteurs dedies
+    const attr = (v) => {
+      const n = typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' ? parseFloat(v) : NaN);
+      return Number.isFinite(n) ? n : null;
+    };
+    // vent/rafales avec leur unite : celle du capteur quand la valeur vient d'un capteur,
+    // wind_speed_unit de l'entite meteo quand elle vient des attributs.
+    const unitOf = (eid) => { const s = eid && S[eid]; return (s && s.attributes && s.attributes.unit_of_measurement) || null; };
+    const pickU = (cfg, suffix, av) => {
+      for (const e of [cfg, `sensor.${base}_${suffix}`]) {
+        const v = num(e);
+        if (v != null) return { v, u: unitOf(e) };
+      }
+      return { v: attr(av), u: (a && a.wind_speed_unit) || null };
+    };
+    const w = pickU(this._config.wind_entity, 'wind_speed', a && a.wind_speed);
+    const g = pickU(null, 'wind_gust', a && a.wind_gust_speed);
     return {
-      wind:    pick(this._config.wind_entity, 'wind_speed'),
-      gust:    pick(null, 'wind_gust'),
+      wind:    w.v,
+      gust:    g.v,
+      windUnit: w.u, gustUnit: g.u,
+      windK:   windToKmh(w.u), gustK: windToKmh(g.u),   // facteur vers km/h (effets)
       rainCh:  pick(this._config.rain_chance_entity, 'rain_chance') ?? 0,
       snowCh:  pick(this._config.snow_chance_entity, 'snow_chance') ?? 0,
     };
@@ -2682,7 +2726,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
     if (!cat) return;
 
     const pop = (once) => {
-      if (this.classList.contains('w-narrow') || document.hidden) { if (!once) schedule(); return; }
+      if (this._elInner.classList.contains('w-narrow') || document.hidden) { if (!once) schedule(); return; }
       if (cat.classList.contains('wcat-pop')) { if (!once) schedule(); return; }
       // brique pendant le pic : aucune en dormant, pas de wink quand les yeux sont plissés
       const DOS = cat.classList.contains('wcat-sleep') ? ['']
@@ -2697,7 +2741,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
         cat.classList.add('wcat-pop');
       }
       if (doCls) cat.classList.add(doCls);
-      setTimeout(() => { cat.classList.remove('wcat-pop'); if (doCls) cat.classList.remove(doCls); }, dur + 60);
+      this._later(() => { cat.classList.remove('wcat-pop'); if (doCls) cat.classList.remove(doCls); }, dur + 60);
       if (!once) schedule();
     };
     this._glitchPop = () => pop(true);
@@ -2715,9 +2759,7 @@ class WeatherNeonCardWebgl extends HTMLElement {
 
   // ══════════════════════════════════════════════════════════════════════════
   //    CIEL WebGL
-  //    Shader : .preview-tooling/weather-neon-card-webgl/sky_shader.py
-  //    ⚠️ NE PAS editer le GLSL ici : ce fichier est GENERE. Toute correction va
-  //       dans sky_shader.py, sinon le banc et la card divergent.
+  //    Shader : GLSL embarque dans ce fichier (source de verite).
   // ══════════════════════════════════════════════════════════════════════════
 
   // Par condition : couverture, grisaille, brume, teinte. C'est la table qui fait
@@ -2967,7 +3009,7 @@ void main(){
     // Perte de contexte : geree UNE fois pour toutes les couches (WNC_GL -> _glLost /
     // _glRestored). Le canvas du ciel n'est plus jamais remplace : c'est un canvas 2D.
 
-    this._skyT0 = performance.now();
+    if (this._shClk) delete this._shClk.sky;   // nouvelle origine du ciel
     this._skyLoop();
   }
 
@@ -3017,6 +3059,19 @@ void main(){
              x: h >= 6 && h < 18 ? (h - 6) / 12 : (h < 6 ? (h + 6) / 12 : (h - 18) / 12) };
   }
 
+  // Horloge (secondes) d'un shader non periodique. float32 perd en precision sur un
+  // temps grand (nuages qui saccadent apres des jours), donc on rebase l'origine :
+  // apres plus de 1 h seulement si la boucle revient d'une absence (onglet cache,
+  // hors ecran : frames > 1 s d'ecart, le saut est invisible), et de force apres 6 h.
+  _shaderClock(k, now) {
+    const m = this._shClk || (this._shClk = {});
+    const s = m[k] || (m[k] = { t0: now, last: now });
+    const el = now - s.t0;
+    if (el > 21600e3 || (el > 3600e3 && now - s.last > 1000)) s.t0 = now;
+    s.last = now;
+    return (now - s.t0) / 1000;
+  }
+
   _skyLoop() {
     const gl = this._gl, cv = this._elSkyGl;
     if (!gl || !cv) { this._skyRAF = null; return; }
@@ -3040,7 +3095,7 @@ void main(){
     // frames s'accumuleraient -- lavis rose sature).
     if (WNC_GL.begin(cv.width, cv.height) !== gl) return;
     WNC_GL.use(this._glP);
-    const c = this._config, U = this._glU, t = (now - this._skyT0) / 1000;
+    const c = this._config, U = this._glU, t = this._shaderClock('sky', now);
     const K = WeatherNeonCardWebgl.SKY_COND[this._skyCond] ||
               WeatherNeonCardWebgl.SKY_COND['partlycloudy'];
     const sun = this._skySun();
@@ -3116,8 +3171,7 @@ void main(){
 
   // ══════════════════════════════════════════════════════════════════════════
   //    EFFETS METEO WebGL (post-process)
-  //    Shader : .preview-tooling/weather-neon-card-webgl/fx_shader.py
-  //    ⚠️ NE PAS editer le GLSL ici : ce fichier est GENERE.
+  //    Shader : GLSL embarque dans ce fichier (source de verite).
   //
   //    Principe : le canvas 2D existant (.wfxmain) reste
   //    la SOURCE -- pluie/vent/brouillard/eclair continuent d'y etre peints par
@@ -3185,27 +3239,7 @@ void main(){
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     if (!ok) { gl.deleteFramebuffer(fbo); gl.deleteTexture(tex); return; }
     this._fogFbo = fbo; this._fogFboTex = tex;
-
-    // buffer STATIQUE : N nappes x 6 sommets (2 triangles), chaque sommet porte son
-    // coin (-1..1) + son uv (0..1) + une graine d'instance (aRnd) commune aux 6
-    // sommets d'une meme nappe -- c'est elle qui fait tourner/vivre la nappe entiere
-    // ensemble dans le vertex shader, sans instancing.
-    const N = (this._config && this._config.fogx_count) || WeatherNeonCardWebgl.FOG_N;
-    const CORNERS = [[-1, -1, 0, 0], [1, -1, 1, 0], [1, 1, 1, 1],
-                      [-1, -1, 0, 0], [1, 1, 1, 1], [-1, 1, 0, 1]];
-    const verts = new Float32Array(N * 6 * 7);   // aCorner(2) aUv(2) aRnd(3)
-    let o = 0;
-    for (let i = 0; i < N; i++) {
-      const r0 = Math.random(), r1 = Math.random(), r2 = Math.random();
-      for (const [cx, cy, ux, uy] of CORNERS) {
-        verts[o++] = cx; verts[o++] = cy; verts[o++] = ux; verts[o++] = uy;
-        verts[o++] = r0; verts[o++] = r1; verts[o++] = r2;
-      }
-    }
-    const vbuf = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
-    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-    this._fogBuf = vbuf; this._fogCount = N * 6;
+    this._fogUpload(gl);
 
     const P = WNC_GL.prog('fog', WeatherNeonCardWebgl.FOG_VS, WeatherNeonCardWebgl.FOG_FS,
                           WeatherNeonCardWebgl.FOG_UNAMES, 'fog');
@@ -3232,6 +3266,32 @@ void main(){
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, this._fogMakePuffTex(192));
     this._fogPuffTex = puffTex;
+  }
+
+  // (Re)construit le buffer des nappes pour fogx_count courant ; _fogCount garde
+  // le nombre de sommets uploade pour detecter un changement de config.
+  _fogUpload(gl) {
+    // buffer STATIQUE : N nappes x 6 sommets (2 triangles), chaque sommet porte son
+    // coin (-1..1) + son uv (0..1) + une graine d'instance (aRnd) commune aux 6
+    // sommets d'une meme nappe -- c'est elle qui fait tourner/vivre la nappe entiere
+    // ensemble dans le vertex shader, sans instancing.
+    const N = (this._config && this._config.fogx_count) || WeatherNeonCardWebgl.FOG_N;
+    const CORNERS = [[-1, -1, 0, 0], [1, -1, 1, 0], [1, 1, 1, 1],
+                      [-1, -1, 0, 0], [1, 1, 1, 1], [-1, 1, 0, 1]];
+    const verts = new Float32Array(N * 6 * 7);   // aCorner(2) aUv(2) aRnd(3)
+    let o = 0;
+    for (let i = 0; i < N; i++) {
+      const r0 = Math.random(), r1 = Math.random(), r2 = Math.random();
+      for (const [cx, cy, ux, uy] of CORNERS) {
+        verts[o++] = cx; verts[o++] = cy; verts[o++] = ux; verts[o++] = uy;
+        verts[o++] = r0; verts[o++] = r1; verts[o++] = r2;
+      }
+    }
+    const vbuf = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, vbuf);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+    if (this._fogBuf) gl.deleteBuffer(this._fogBuf);
+    this._fogBuf = vbuf; this._fogCount = N * 6;
   }
 
   // fBm (5 octaves, bruit de valeur) sur un canvas NxN, alpha nul au bord et zones a
@@ -3266,6 +3326,8 @@ void main(){
   // restaure viewport + blend du quad vitre. Appelee par _fxGlDraw avant useProgram(G.pr).
   _fogFboDraw(gl, now, cvW, cvH, c, level) {
     if (!this._fogFbo || !this._fogProg) return;
+    // fogx_count modifie en cours de route : on reconstruit seulement le buffer
+    if (this._fogCount !== (c.fogx_count || WeatherNeonCardWebgl.FOG_N) * 6) this._fogUpload(gl);
     if (this._fogW !== cvW || this._fogH !== cvH) {
       gl.bindTexture(gl.TEXTURE_2D, this._fogFboTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, cvW, cvH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
@@ -3280,18 +3342,15 @@ void main(){
     gl.useProgram(P.pr);
     gl.bindBuffer(gl.ARRAY_BUFFER, this._fogBuf);
     const stride = 7 * 4;
-    gl.enableVertexAttribArray(P.aCorner);
-    gl.vertexAttribPointer(P.aCorner, 2, gl.FLOAT, false, stride, 0);
-    gl.enableVertexAttribArray(P.aUv);
-    gl.vertexAttribPointer(P.aUv, 2, gl.FLOAT, false, stride, 8);
-    gl.enableVertexAttribArray(P.aRnd);
-    gl.vertexAttribPointer(P.aRnd, 3, gl.FLOAT, false, stride, 16);
+    if (P.aCorner >= 0) { gl.enableVertexAttribArray(P.aCorner); gl.vertexAttribPointer(P.aCorner, 2, gl.FLOAT, false, stride, 0); }
+    if (P.aUv >= 0) { gl.enableVertexAttribArray(P.aUv); gl.vertexAttribPointer(P.aUv, 2, gl.FLOAT, false, stride, 8); }
+    if (P.aRnd >= 0) { gl.enableVertexAttribArray(P.aRnd); gl.vertexAttribPointer(P.aRnd, 3, gl.FLOAT, false, stride, 16); }
 
     // Reglages : count/size/opacity/speed/
     // spin/hue/blink/ground en config fogx_*, level = maitre-volume (fogLevelFbo).
     const U = P.U;
     if (U.uRes != null) gl.uniform2f(U.uRes, cvW, cvH);
-    if (U.uTime != null) gl.uniform1f(U.uTime, now / 1000);
+    if (U.uTime != null) gl.uniform1f(U.uTime, this._shaderClock('fx', now));
     if (U.uSpin != null) gl.uniform1f(U.uSpin, c.fogx_spin);
     if (U.uSize != null) gl.uniform1f(U.uSize, c.fogx_size);
     if (U.uSpeed != null) gl.uniform1f(U.uSpeed, c.fogx_speed);
@@ -3480,10 +3539,10 @@ void main(){
       gl.useProgram(P.pr);
       gl.bindBuffer(gl.ARRAY_BUFFER, this._snowBuf);
       const S = 9 * 4;
-      gl.enableVertexAttribArray(P.aSeed);  gl.vertexAttribPointer(P.aSeed, 3, gl.FLOAT, false, S, 0);
-      gl.enableVertexAttribArray(P.aSpeed); gl.vertexAttribPointer(P.aSpeed, 3, gl.FLOAT, false, S, 12);
-      gl.enableVertexAttribArray(P.aRnd);   gl.vertexAttribPointer(P.aRnd, 2, gl.FLOAT, false, S, 24);
-      gl.enableVertexAttribArray(P.aSize);  gl.vertexAttribPointer(P.aSize, 1, gl.FLOAT, false, S, 32);
+      if (P.aSeed >= 0)  { gl.enableVertexAttribArray(P.aSeed);  gl.vertexAttribPointer(P.aSeed, 3, gl.FLOAT, false, S, 0); }
+      if (P.aSpeed >= 0) { gl.enableVertexAttribArray(P.aSpeed); gl.vertexAttribPointer(P.aSpeed, 3, gl.FLOAT, false, S, 12); }
+      if (P.aRnd >= 0)   { gl.enableVertexAttribArray(P.aRnd);   gl.vertexAttribPointer(P.aRnd, 2, gl.FLOAT, false, S, 24); }
+      if (P.aSize >= 0)  { gl.enableVertexAttribArray(P.aSize);  gl.vertexAttribPointer(P.aSize, 1, gl.FLOAT, false, S, 32); }
 
       // programme PARTAGE : tous les uniforms a chaque passe (cf WNC_GL.prog)
       const U = P.U;
@@ -3555,9 +3614,14 @@ void main(){
   // on ne cree pas de machinerie neuve, on reutilise celle qui tient deja.
   // Surcharge -webgl : la variante de base ne connait que le canvas 2D d'effets ;
   // ici il y a en plus le ciel, dont la boucle se desarme aussi hors ecran.
+  // Relance les boucles desarmees par la sortie d'ecran (effets, ciel, chaleur, aurore).
   _loopsResume() {
     if (this._elFxCv) this._ensureFxLoop();
     if (this._gl && this._elSkyGl && !this._skyRAF) { this._skyLast = 0; this._skyLoop(); }
+    // la boucle de chaleur se desarme hors ecran : on la relance si la canicule dure
+    if (this._fxHeatOn) this._startHeat();
+    // idem pour l'aurore : _aurLoop se desarme hors ecran
+    if (this._aurGl && !this._aurRAF) this._aurLoop();
   }
 
   _fxGlEnsure() {
@@ -3738,7 +3802,14 @@ void main(){
     const snowGl = this._snowGlOn();      // meme predicat que le repli 2D de la boucle
     if (snowGl)  { defs.push('FX_SNOW');  key.push('s'); }
     const G = this._fxProgram(key.join('') || 'none', defs);
-    if (!G) { this._fxGlStop(); return; }   // shader casse -> on rend la main au 2D
+    if (!G) {
+      // shader casse -> on rend la main au 2D. Hors perte de contexte (qui efface le cache
+      // de programmes et se repare seule), l'echec est definitif pour cette instance :
+      // _fxCapable faux, sinon _fxGlEnsure recreerait textures et FBO a chaque rendu.
+      if (!gl.isContextLost()) { this._fxGlBroken = true; this._fxCapable = false; }
+      this._fxGlStop();
+      return;
+    }
 
     // fogAmt calcule ICI (avant others/le reste de l'arbitrage cumuls) pour piloter
     // le maitre-volume des nappes du FBO -- besoin du meme calcul que plus bas ligne
@@ -3832,8 +3903,7 @@ void main(){
 
     const ap = G.ap;
     gl.bindBuffer(gl.ARRAY_BUFFER, WNC_GL.triBuf());
-    gl.enableVertexAttribArray(ap);
-    gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0);
+    if (ap >= 0) { gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 2, gl.FLOAT, false, 0, 0); }
 
     // getUniformLocation rend null pour un uniform elimine par le compilateur ;
     // gl.uniform*(null, ...) est un no-op legal -> on pousse tout le jeu sans tester.
@@ -3845,7 +3915,7 @@ void main(){
     if (U.uFog   != null) gl.uniform1i(U.uFog, 4);
     if (U.uSnow  != null) gl.uniform1i(U.uSnow, 5);
     if (U.uRes   != null) gl.uniform2f(U.uRes, cv.width, cv.height);
-    u1('uTime', (now - (this._fxT0 = this._fxT0 || now)) / 1000);
+    u1('uTime', this._shaderClock('fx', now));
     u1('uCap', c.fx_plafond);
 
     // ── ARBITRAGE DES CUMULS : deux effets sur la meme vitre se
@@ -4557,8 +4627,7 @@ void main(){
 
   // ══════════════════════════════════════════════════════════════════════════
   //    AURORE BOREALE -- EASTER EGG
-  //    Shader : .preview-tooling/weather-neon-card-webgl/aurora_shader.py
-  //    ⚠️ NE PAS editer le GLSL ici : ce fichier est GENERE.
+  //    Shader : GLSL embarque dans ce fichier (source de verite).
   //
   //    Ce n'est pas un effet meteo. Aucun capteur Kp / aurore n'existe dans ce HA
   //    (verifie) : une aurore inconditionnelle serait le SEUL element de la card
@@ -4963,7 +5032,7 @@ void main(){
   col *= clamp(uOpacity,0.0,1.0);
   col  = max(col,vec3(0.0));
 
-  // Alpha derivee du CONTENU (meme doctrine que sky_shader) : la ou l aurore
+  // Alpha derivee du CONTENU (meme doctrine que le shader du ciel) : la ou l aurore
   // n emet rien, alpha=0 et le ciel passe intact. La couche est en
   // mix-blend-mode:screen cote CSS -> les etoiles restent visibles a travers,
   // ce qui est le comportement d un milieu purement emissif.
@@ -5003,6 +5072,8 @@ void main(){
   }
 
   _aurLoop() {
+    // hors ecran : on desarme au lieu de re-armer (relance par _loopsResume)
+    if (this._fxOff) { this._aurRAF = null; return; }
     this._aurRAF = requestAnimationFrame(() => this._aurLoop());
     const gl = this._aurGl, cv = this._elAurGl;
     if (!gl || !cv) return;
@@ -5050,6 +5121,7 @@ void main(){
   // Rattache : on RECONSTRUIT. Copie de l'idiome de neon-dual-thermo-card-webgl
   // (_wglGraft au connectedCallback), la seule de la famille qui n'ait jamais eu ce bug.
   connectedCallback() {
+    this._fitGen++;
     this._fetchForecast();
     if (!this._built || !this._config) return;   // le premier montage passe par _render()
     if (!this._ro) this._observeSize();
@@ -5057,7 +5129,7 @@ void main(){
     // idem : au rattachement on ne REOUVRE pas d'office, on redemande a _fxGlEnsure.
     // (Le ciel, lui, se reinitialise inconditionnellement juste au-dessus : c'est le
     // fond de la card, il doit repeindre des le retour.)
-    this._fxCapable = !!this._config.fx_gl;
+    this._fxCapable = !!this._config.fx_gl && !this._fxGlBroken;
     this._fxGlEnsure();
     this._skyLast = 0;              // la prochaine frame repeint tout de suite
     this._fxMixUp = null;           // invalide la mixmap de givre (taille possiblement changee)
@@ -5137,6 +5209,8 @@ WeatherNeonCardWebgl.styles = `
       0 0 12px var(--acc),
       0 0 30px var(--acc),
       0 0 60px color-mix(in srgb, var(--acc) 40%, transparent); }
+  .wtemp[role="button"] { cursor:pointer; }
+  .wtemp:focus-visible, .watmo:focus-visible { outline:2px solid var(--acc); outline-offset:2px; }
   .wtemp small { font-size:.5em; vertical-align:super; margin-left:2px; opacity:.85; font-weight:500; }
   .wnow { flex:1; min-width:0; position:relative; }
   .wicon .wico { filter:drop-shadow(0 0 10px color-mix(in srgb, var(--acc) 28%, transparent)); }
@@ -5912,7 +5986,7 @@ if (!customElements.get('weather-neon-card')) customElements.define('weather-neo
 // ═══════════════════════════════════════════════════════
 //  EDITOR — variante WebGL, pattern canonique (skill ha-neon-css,
 //  strategie A sync in-place + _group() repliable). Ecrit directement
-//  ici (genere), PAS derive de WeatherNeonCardEditor (source canvas 2D) :
+//  ici, PAS derive de WeatherNeonCardEditor (source canvas 2D) :
 //  ~75 des champs (sky_*/fx_*) n'existent QUE dans cette variante, les
 //  ajouter a la source canvas 2D y creerait des champs morts.
 //  Pas de bloc "header".
@@ -5929,39 +6003,27 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   set hass(h) { this._hass = h; _setLang(h); if (this._rendered && this._bl !== _lang) this._renderEditor(); else this._fillDatalists(); }   // JAMAIS de render ici
   disconnectedCallback() { this._rendered = false; }
 
-  // ── Lecture / écriture config (clés imbriquées via ".") ────────────
-  _read(key) {
-    return key.includes('.')
-      ? key.split('.').reduce((o, p) => (o && o[p] !== undefined ? o[p] : undefined), this._config)
-      : this._config[key];
-  }
+  // ── Lecture / écriture config (clés plates) ────────────────────────
+  _read(key) { return this._config[key]; }
   _set(key, value) {
-    const empty = (value === undefined || value === '' || value === null);
-    if (key.includes('.')) {
-      const parts = key.split('.');
-      let o = this._config;
-      for (let i = 0; i < parts.length - 1; i++) {
-        if (!o[parts[i]] || typeof o[parts[i]] !== 'object') o[parts[i]] = {};
-        o = o[parts[i]];
-      }
-      const last = parts[parts.length - 1];
-      if (empty) delete o[last]; else o[last] = value;
-      const parent = parts.slice(0, -1).reduce((a, k) => a && a[k], this._config);
-      if (parent && typeof parent === 'object' && !Object.keys(parent).length) delete this._config[parts[0]];
-    } else if (empty) { delete this._config[key]; }
-    else { this._config[key] = value; }
+    // lux_entity: '' (cle presente, vide) = "soleil seul" ; cle absente = capteur par
+    // defaut (cf buildConfig). On ne doit donc pas supprimer la cle quand on la vide.
+    const empty = (value === undefined || value === '' || value === null) && !(key === 'lux_entity' && value === '');
+    if (empty) delete this._config[key]; else this._config[key] = value;
+    if (key === 'entity') this._updateGuess();
     this.dispatchEvent(new CustomEvent('config-changed',
       { detail: { config: { ...this._config } }, bubbles: true, composed: true }));
   }
 
-  // ── Sync in-place (guard focus + clés imbriquées) ──────────────────
+  // ── Sync in-place (guard focus) ──────────────────
   _syncValues() {
+    this._updateGuess();
     const active = this.querySelector(':focus') || document.activeElement;
     this.querySelectorAll('[data-key]').forEach(el => {
       if (el === active) return;
       const v = this._read(el.dataset.key);
       if (el.type === 'checkbox') el.checked = el.dataset.defaultOn ? (v !== false) : !!v;
-      else { el.value = (v == null ? '' : v); }
+      else { el.value = (v == null ? (el.dataset.def ?? '') : v); }
     });
   }
 
@@ -5986,7 +6048,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _text(key, label, ph = '') {
     const row = this._row(label);
     const inp = document.createElement('input');
-    inp.type = 'text'; inp.placeholder = _t(ph); inp.dataset.key = key;
+    inp.type = 'text'; inp.placeholder = _t(ph); inp.dataset.key = key; inp.id = row.id;
     inp.value = this._read(key) ?? '';
     inp.addEventListener('input', () => this._set(key, inp.value));
     row.wrap.appendChild(inp); return inp;
@@ -5996,7 +6058,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     const row = this._row(label);
     const inp = document.createElement('input');
     inp.type = 'number'; if (min != null) inp.min = min; if (max != null) inp.max = max;
-    inp.step = step; inp.placeholder = ph; inp.dataset.key = key;
+    inp.step = step; inp.placeholder = ph; inp.dataset.key = key; inp.id = row.id;
     inp.value = this._read(key) ?? '';
     inp.addEventListener('input', () => { const n = parseFloat(inp.value); this._set(key, isNaN(n) ? undefined : n); });
     row.wrap.appendChild(inp); return inp;
@@ -6004,7 +6066,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
 
   _toggle(key, label, defaultOn = false) {
     const row = this._row(label);
-    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.key = key;
+    const cb = document.createElement('input'); cb.type = 'checkbox'; cb.dataset.key = key; cb.id = row.id;
     if (defaultOn) cb.dataset.defaultOn = '1';
     const v = this._read(key);
     cb.checked = defaultOn ? (v !== false) : !!v;
@@ -6013,9 +6075,10 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     row.wrap.appendChild(cb); return cb;
   }
 
-  _select(key, label, options, emptyLabel = null) {
-    const w = this._row(label).wrap;
-    const sel = document.createElement('select'); sel.dataset.key = key;
+  _select(key, label, options, emptyLabel = null, def = null) {
+    const row = this._row(label), w = row.wrap;
+    const sel = document.createElement('select'); sel.dataset.key = key; sel.id = row.id;
+    if (def !== null) sel.dataset.def = def;   // valeur appliquee par la card quand la cle est absente
     if (emptyLabel !== null) { const o = document.createElement('option'); o.value = ''; o.textContent = _t(emptyLabel); sel.appendChild(o); }
     options.forEach(opt => {
       const o = document.createElement('option');
@@ -6023,7 +6086,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       o.textContent = (typeof opt === 'object') ? opt.label : opt;
       sel.appendChild(o);
     });
-    sel.value = this._read(key) ?? '';
+    sel.value = this._read(key) ?? def ?? '';
     sel.addEventListener('change', () => this._set(key, sel.value));
     w.appendChild(sel); return sel;
   }
@@ -6032,9 +6095,10 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   // `placeholder` : surcharge le repli générique ("sensor.…") par le nom REEL
   // auto-devine par la card (entityBase + suffixe) quand le champ est vide —
   // pour que ce ne soit pas lu comme "hardcodé" alors que c'est un vrai repli.
-  _entity(key, label, prefix = '', placeholder = '') {
+  _entity(key, label, prefix = '', placeholder = '', guessSuffix = '') {
     const row = this._row(label);
-    const inp = document.createElement('input'); inp.type = 'text'; inp.autocomplete = 'off';
+    const inp = document.createElement('input'); inp.type = 'text'; inp.autocomplete = 'off'; inp.id = row.id;
+    if (guessSuffix) inp.dataset.guess = guessSuffix;   // placeholder recalcule quand `entity` change
     inp.placeholder = _t(placeholder) || (prefix || 'domain') + '.…'; inp.dataset.key = key; inp.dataset.prefix = prefix;
     inp.setAttribute('list', `weathergl-ent-${(prefix || 'all').replace(/[^a-z]/g, '')}`);
     inp.value = this._read(key) ?? '';
@@ -6047,25 +6111,46 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     const row = document.createElement('div'); row.className = 'row';
     const lbl = document.createElement('label');
     if (isHtml) lbl.innerHTML = _t(labelHtml); else lbl.textContent = _t(labelHtml);
+    // id unique : le champ pose ce meme id, le label devient cliquable et lisible par les AT
+    const id = 'wnced-' + (WeatherNeonCardWebglEditor._seq = (WeatherNeonCardWebglEditor._seq || 0) + 1);
+    lbl.htmlFor = id;
     const wrap = document.createElement('div'); wrap.className = 'field-wrap';
     row.appendChild(lbl); row.appendChild(wrap); (this._appendTo || this).appendChild(row);
-    return { row, wrap };
+    return { row, wrap, id };
+  }
+
+  // Nom auto-devine par la card (entityBase + suffixe) quand le champ est vide.
+  _guessPh(suffix) {
+    const base = (this._read('entity') || '').replace(/^weather\./, '');
+    return base ? `sensor.${base}_${suffix} (auto)` : 'sensor.…';
+  }
+  _updateGuess() {
+    this.querySelectorAll('input[data-guess]').forEach(el => { el.placeholder = this._guessPh(el.dataset.guess); });
   }
 
   _fillDatalists() {
     if (!this._hass) return;
+    // hass change a chaque etat : on ne reconstruit que si l'ensemble des entites a change
+    // (l'objet states est remplace a chaque mise a jour, donc comparer les cles, pas la reference).
+    const keys = Object.keys(this._hass.states);
+    const prev = this._dlKeys;
+    if (prev && prev.size === keys.length && keys.every(k => prev.has(k))) return;
+    const byId = new Map();   // une datalist par prefixe, partagee par tous les champs
     this.querySelectorAll('input[data-prefix]').forEach(inp => {
-      const id = inp.getAttribute('list'); if (!id) return;
+      const id = inp.getAttribute('list');
+      if (id && !byId.has(id)) byId.set(id, inp.dataset.prefix || '');
+    });
+    byId.forEach((prefix, id) => {
       let dl = this.querySelector('#' + id);
       if (!dl) { dl = document.createElement('datalist'); dl.id = id; this.appendChild(dl); }
-      const ids = Object.keys(this._hass.states).filter(e => e.startsWith(inp.dataset.prefix || '')).sort();
-      if (dl.childElementCount === ids.length) return;   // déjà à jour
+      const ids = keys.filter(e => e.startsWith(prefix)).sort();
       dl.textContent = '';
       const frag = document.createDocumentFragment();
       ids.forEach(id2 => { const o = document.createElement('option'); o.value = id2;
         const fn = this._hass.states[id2].attributes?.friendly_name; if (fn && fn !== id2) o.label = fn; frag.appendChild(o); });
       dl.appendChild(frag);
     });
+    this._dlKeys = new Set(keys);
   }
 
   // ── CSS commun (identique aux autres cartes néon) ───────────────────
@@ -6090,6 +6175,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
   _renderEditor() {
     this._bl = _lang;
     this.innerHTML = '';
+    this._dlKeys = null;   // les datalists viennent d'etre detruites
     const st = document.createElement('style'); st.textContent = this._css(); this.appendChild(st);
     this._schema();
     this._fillDatalists();
@@ -6106,17 +6192,16 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     // ces champs restent vides, elle devine sensor.<base>_<suffixe> a partir
     // de `entity`. On l'affiche en placeholder pour que ce ne soit pas pris
     // pour du hardcode -- c'est le nom REELLEMENT utilise en repli.
-    const base = (this._read('entity') || '').replace(/^weather\./, '');
-    const guess = (suffix) => base ? `sensor.${base}_${suffix} (auto)` : 'sensor.…';
+    const guess = (suffix) => this._guessPh(suffix);
 
     this._group('Entités additionnelles', false, () => {
       this._entity('alert_entity', 'Vigilance (Météo-France)', 'sensor');
       this._entity('sun_entity', 'Soleil (lever/coucher)', 'sun', 'sun.sun (défaut)');
       this._entity('lux_entity', 'Luminosité (jour/nuit)', 'sensor', 'sensor.outdoor_illuminance');
-      this._entity('wind_entity', 'Vent (rafales)', 'sensor', guess('wind_speed'));
-      this._entity('rain_chance_entity', 'Chance de pluie', 'sensor', guess('rain_chance'));
-      this._entity('snow_chance_entity', 'Chance de neige', 'sensor', guess('snow_chance'));
-      this._entity('condition_label_entity', 'Libellé condition custom', 'sensor', guess('original_condition'));
+      this._entity('wind_entity', 'Vent (rafales)', 'sensor', guess('wind_speed'), 'wind_speed');
+      this._entity('rain_chance_entity', 'Chance de pluie', 'sensor', guess('rain_chance'), 'rain_chance');
+      this._entity('snow_chance_entity', 'Chance de neige', 'sensor', guess('snow_chance'), 'snow_chance');
+      this._entity('condition_label_entity', 'Libellé condition custom', 'sensor', guess('original_condition'), 'original_condition');
       this._entity('air_entity', 'Qualité air (jour)', 'sensor');
       this._entity('air_entity_next', 'Qualité air (J+1)', 'sensor');
       this._entity('pollen_entity', 'Pollens (jour)', 'sensor');
@@ -6124,7 +6209,9 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
     });
 
     this._group('Prévisions & affichage', false, () => {
-      this._select('forecast_type', 'Type de prévision', ['daily', 'hourly', 'twice_daily'], null);
+      this._select('forecast_type', 'Type de prévision', [
+        { value: 'daily', label: _t('Par jour') }, { value: 'hourly', label: _t('Par heure') },
+        { value: 'twice_daily', label: _t('Deux fois par jour') }], null, 'daily');
       this._number('forecast_count', 'Nb de jours/créneaux', { min: 1, max: 10, step: 1, ph: '5' });
       this._toggle('show_name', 'Afficher le nom', true);
       this._toggle('show_aside', 'Colonne lever/coucher/rafales', true);
@@ -6150,7 +6237,7 @@ class WeatherNeonCardWebglEditor extends HTMLElement {
       this._toggle('orbitron', 'Typo Orbitron', false);
       this._toggle('mood_accent', 'Accent couleur = condition', true);
       this._toggle('reactive_bg', 'Fond réactif (écrase card-mod)', false);
-      this._toggle('night_from_sun', "Nuit déduite du soleil (sinon lux)", true);
+      this._toggle('night_from_sun', 'Jour/nuit recalculé (lux, repli soleil)', true);
       this._toggle('particles', 'Particules CSS/canvas', true);
       this._toggle('frost', 'Cristaux de givre', true);
       this._number('frost_below', 'Seuil givre (°C)', { min: -20, max: 15, step: 1, ph: '3' });
